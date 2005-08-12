@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.1 2005/08/12 01:29:07 stas Exp $
+ * $Id: pam_af.c,v 1.1.1.1 2005/08/12 01:29:07 stas Exp $
  */
 
 #include <errno.h>
