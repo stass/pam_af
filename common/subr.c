@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.1 2005/08/15 02:33:31 stas Exp $
+ * $Id: subr.c,v 1.2 2005/08/15 16:10:08 stas Exp $
  */
 
 #include <errno.h>
@@ -59,6 +59,115 @@
 const char *stdb = STATDB;
 const char *cfgdb = CFGDB;
 
+#define IPV4_ADDR(sockaddr) \
+    ((char *)&(((struct sockaddr_in *)sockaddr)->sin_addr.s_addr))
+#define IPV6_ADDR(sockaddr) \
+    ((char *)((struct sockaddr_in6 *)sockaddr)->sin6_addr.s6_addr)
+#define IPV4SZ sizeof(struct in_addr)
+#define IPV6SZ sizeof(struct in6_addr)
+
+void
+my_freeaddrinfo(mai0)
+	myaddrinfo_t	*mai0;
+{
+	myaddrinfo_t *mai, *mai1;
+
+	for(mai = mai0; mai; mai = mai1) {
+		mai1 = mai->next;
+		free(mai->addr);
+		free(mai);
+	}
+}
+
+const char *
+my_gai_strerror(err)
+	int err;
+{
+	return(gai_strerror(err));
+}
+
+int
+my_getaddrinfo(host, family, retmai)
+	char	*host;
+	int	family;
+	myaddrinfo_t	**retmai;
+{
+	struct addrinfo hints, *res, *res0;
+	myaddrinfo_t *mai, **last;
+	int ret;
+	
+	if (strncmp(host, DEFRULE, strlen(DEFRULE)) == 0) {
+		*retmai = (myaddrinfo_t *)malloc(sizeof(myaddrinfo_t));
+		if (*retmai == NULL)
+			return EAI_MEMORY;
+		mai = *retmai;
+		mai->next = NULL;
+		mai->addr = (char *)malloc(strlen(DEFRULE));
+		if (mai->addr == NULL)
+			return EAI_MEMORY;
+		bcopy(DEFRULE, mai->addr, strlen(DEFRULE));
+		mai->addrlen = strlen(DEFRULE);
+		return 0;
+	}
+
+	bzero(&hints, sizeof(hints));
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_family = family;
+
+        if ((ret = getaddrinfo(host, NULL, &hints, &res0)) != 0)
+		return ret;
+
+        for (res = res0, last = retmai; res; res = res->ai_next) {
+		*last = (myaddrinfo_t *)malloc(sizeof(myaddrinfo_t));
+		mai = *last;
+		if (mai == NULL) {
+			my_freeaddrinfo(*retmai);
+			return EAI_MEMORY;
+		}
+		mai->next = NULL;
+
+                switch (res->ai_family) {
+                case PF_INET:
+				mai->addr = (char *)malloc(IPV4SZ);
+				if (mai->addr == NULL) {
+					my_freeaddrinfo(*retmai);
+					return EAI_MEMORY;
+				}
+                                bcopy(IPV4_ADDR(res->ai_addr), mai->addr, \
+				    IPV4SZ);
+                                mai->addrlen = IPV4SZ;
+                                break;
+
+                case PF_INET6:
+				mai->addr = (char *)malloc(IPV6SZ);
+				if (mai->addr == NULL) {
+					my_freeaddrinfo(*retmai);
+					return EAI_MEMORY;
+				}
+                                bcopy(IPV6_ADDR(res->ai_addr), mai->addr, \
+				    IPV6SZ);
+                                mai->addrlen = IPV6SZ;
+                                break;
+
+                default:
+				mai->addr = (char *)malloc(res->ai_addrlen);
+				if (mai->addr == NULL) {
+					my_freeaddrinfo(*retmai);
+					return EAI_MEMORY;
+				}
+                                bcopy(res->ai_addr, mai->addr, \
+				    res->ai_addrlen);
+                                mai->addrlen = res->ai_addrlen;
+                                break;
+                }
+		last = &mai->next;
+	}
+
+	freeaddrinfo(res0);
+
+	return 0;
+}
+ 
 hostrule_t *
 find_host_rule(dbp, host)
 	DBM	*dbp;

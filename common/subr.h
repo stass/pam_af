@@ -28,32 +28,37 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.h,v 1.1 2005/08/15 02:33:31 stas Exp $
+ * $Id: subr.h,v 1.2 2005/08/15 16:10:08 stas Exp $
  */
+
+typedef struct myaddrinfo {
+	struct myaddrinfo	*next;
+	char			*addr;
+	size_t			addrlen;
+} myaddrinfo_t;
 
 /* Prototypes */
 
-int		addr_cmp	__P((const void *addr1,		\
-				     const void *addr2,		\
-				     size_t addrlen,		\
-				     int32_t mask));
-
-int		exec_cmd	__P((const char *str, 		\
-				     char * const env[],	\
-				     char *ebuf,		\
-				     size_t ebufsz));
-
-int		parse_time	__P((const char *str,		\
-				     long *ptime));
-
-int		lock_host	__P((hostrec_t *hstrec,		\
-				     hostrule_t *hstent,	\
-				     int fflag));
-
-int		unlock_host	__P((hostrec_t *hstrec,		\
-				     hostrule_t *hstent,	\
-				     int fflag));
-
-hostrule_t *	find_host_rule	__P((DBM *dbp,			\
-				     char *host));
-
+int		addr_cmp		__P((const void *addr1,		\
+					     const void *addr2,		\
+					     size_t addrlen,		\
+					     int32_t mask));
+int		exec_cmd		__P((const char *str, 		\
+					     char * const env[],	\
+					     char *ebuf,		\
+					     size_t ebufsz));
+int		parse_time		__P((const char *str,		\
+					     long *ptime));
+int		lock_host		__P((hostrec_t *hstrec,		\
+					     hostrule_t *hstent,	\
+					     int fflag));
+int		unlock_host		__P((hostrec_t *hstrec,		\
+					     hostrule_t *hstent,	\
+					     int fflag));
+hostrule_t *	find_host_rule		__P((DBM *dbp,			\
+					     char *host));
+void		my_freeaddrinfo 	__P((myaddrinfo_t *mai0));
+const char *	my_gai_strerror		__P((int err));
+int		my_getaddrinfo		__P((char *host,		\
+					     int family,		\
+					     myaddrinfo_t **retmai));
