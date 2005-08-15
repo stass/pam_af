@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.2 2005/08/15 13:11:14 stas Exp $
+ * $Id: pam_af_tool.c,v 1.3 2005/08/15 13:15:32 stas Exp $
  */
 
 #include <errno.h>
@@ -422,7 +422,7 @@ handle_rulemod(argc, argv)
 			}
 			continue;
 		}
-		else if (data.dsize != sizeof(hstent))
+		else if (data.dsize != sizeof(*hstent))
 			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
@@ -559,7 +559,7 @@ handle_ruledel(argc, argv)
 			}
 			continue;
 		}
-		else if (data.dsize != sizeof(hstent))
+		else if (data.dsize != sizeof(*hstent))
 			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
@@ -650,7 +650,7 @@ handle_rulelist(argc, argv)
 		if (data.dptr == NULL) {
 			err(EX_OSERR, "can't fetch data");
 		}
-		else if (data.dsize != sizeof(hstent))
+		else if (data.dsize != sizeof(*hstent))
 			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
@@ -956,7 +956,7 @@ handle_lock(argc, argv)
 		data = dbm_fetch(stdbp, key);
 		if (data.dptr == NULL)
 			err(EX_OSERR, "can't fetch data from %s", stdb);
-		else if (data.dsize != sizeof(hstrec))
+		else if (data.dsize != sizeof(*hstrec))
 			errx(EX_DATAERR, "database %s seriously broken", stdb);
 		else
 			hstrec = (hostrec_t *)data.dptr;
@@ -978,8 +978,8 @@ handle_lock(argc, argv)
 			data = dbm_fetch(stdbp, key);
 			if (data.dptr == NULL)
 				err(EX_OSERR, "can't fetch data from %s", stdb);
-			else if (data.dsize != sizeof(hstrec))
-				errx(EX_DATAERR, "database %s seriously ", \
+			else if (data.dsize != sizeof(*hstrec))
+				errx(EX_DATAERR, "database %s seriously " \
 				    "broken", stdb);
 			else
 				hstrec = (hostrec_t *)data.dptr;
@@ -1063,7 +1063,7 @@ handle_unlock(argc, argv)
 		data = dbm_fetch(stdbp, key);
 		if (data.dptr == NULL)
 			err(EX_OSERR, "can't fetch data from %s", stdb);
-		else if (data.dsize != sizeof(hstrec))
+		else if (data.dsize != sizeof(*hstrec))
 			errx(EX_DATAERR, "database %s seriously broken", stdb);
 		else
 			hstrec = (hostrec_t *)data.dptr;
@@ -1084,8 +1084,8 @@ handle_unlock(argc, argv)
 			data = dbm_fetch(stdbp, key);
 			if (data.dptr == NULL)
 				err(EX_OSERR, "can't fetch data from %s", stdb);
-			else if (data.dsize != sizeof(hstrec))
-				errx(EX_DATAERR, "database %s seriously ", \
+			else if (data.dsize != sizeof(*hstrec))
+				errx(EX_DATAERR, "database %s seriously " \
 				    "broken", stdb);
 			else
 				hstrec = (hostrec_t *)data.dptr;
