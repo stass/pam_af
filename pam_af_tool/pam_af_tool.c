@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.4 2005/08/15 13:19:06 stas Exp $
+ * $Id: pam_af_tool.c,v 1.5 2005/08/15 16:09:50 stas Exp $
  */
 
 #include <errno.h>
@@ -159,10 +159,11 @@ handle_ruleadd(argc, argv)
 	int ch, ret, flags = DBM_REPLACE;
 	char *host = NULL;
 	datum key, data;
-	struct addrinfo hints, *res, *res0;
+	struct myaddrinfo *res, *res0;
 	hostrule_t hstent;
 	char *tmp;
 	char buf[1024];
+	int family;
 
 	bzero(&hstent, sizeof(hstent));
 	hstent.attempts = -1;
@@ -237,40 +238,21 @@ handle_ruleadd(argc, argv)
 	        hstent.mask = atoi(tmp);
 	}
 
-	bzero(&hints, sizeof(hints));
-	hints.ai_protocol = IPPROTO_TCP;
-
 	if (hstent.mask > 128)
 		errx(EX_USAGE, "invalid mask");
 	else if (hstent.mask > 32)
-		hints.ai_family = PF_INET6;
+		family = PF_INET6;
 	else if (hstent.mask > 0)
-		hints.ai_family = PF_INET;
+		family = PF_INET;
 	else
-		hints.ai_family = PF_UNSPEC;
+		family = PF_UNSPEC;
 
-	if ((ret = getaddrinfo(host, NULL, &hints, &res0)) != 0)
+	if ((ret = my_getaddrinfo(host, family, &res0)) != 0)
 		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
-		    host, gai_strerror(ret));
-
-	for (res = res0; res; res = res->ai_next) {
-		switch (res->ai_family) {
-		case PF_INET:
-				key.dptr = (char *)&(((struct sockaddr_in *) \
-				res->ai_addr)->sin_addr.s_addr);
-				key.dsize = 4;
-				break;
-		case PF_INET6:
-				key.dptr = (char *)((struct sockaddr_in6 *) \
-				res->ai_addr)->sin6_addr.s6_addr;
-				key.dsize = 16;
-				break;
-		default:
-				key.dptr = (char *)res->ai_addr;
-				key.dsize = res->ai_addrlen;
-				break;
-		}
-		
+		    host, my_gai_strerror(ret));
+	for (res = res0; res; res = res->next) {
+		key.dptr = res->addr;
+		key.dsize = res->addrlen;
 		data.dptr = (char *)&hstent;
 		data.dsize = sizeof(hstent);
 	
@@ -285,13 +267,14 @@ handle_ruleadd(argc, argv)
 			continue;
 		}
 		if (vflag) {
-			if (getnameinfo(res->ai_addr, res->ai_addrlen, \
-			    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
-				err(EX_OSERR, "can't get numeric address");
-			fprintf(stderr, "Stored rule for %s.\n", buf);
+//			if (getnameinfo(res->ai_addr, res->ai_addrlen, \
+//			    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
+//				err(EX_OSERR, "can't get numeric address");
+//			fprintf(stderr, "Stored rule for %s.\n", buf);
+/*	XXX: fix */
 		}
 	}
-	freeaddrinfo(res0);
+	my_freeaddrinfo(res0);
 
 	exit(EX_OK);
 }
@@ -304,7 +287,7 @@ handle_rulemod(argc, argv)
 	int ch, ret, flags = DBM_REPLACE;
 	char *host = NULL;
 	datum key, data;
-	struct addrinfo hints, *res, *res0;
+	struct myaddrinfo *res, *res0;
 	hostrule_t *hstent;
 	long attempts = -1, locktime = -1;
 	char *lockcmd = NULL, *unlockcmd = NULL;
@@ -312,6 +295,7 @@ handle_rulemod(argc, argv)
 	char *tmp;
 	int found = 0;
 	int mask;
+	int family;
 
 	while ((ch = getopt(argc, argv, "h:a:t:l:u:d:v")) != -1) {
 		switch (ch) {
@@ -377,43 +361,27 @@ handle_rulemod(argc, argv)
 	        mask = atoi(tmp);
 	}
 
-	bzero(&hints, sizeof(hints));
-	hints.ai_protocol = IPPROTO_TCP;
-
 	if (mask > 128)
 		errx(EX_USAGE, "invalid mask");
 	else if (mask > 32)
-		hints.ai_family = PF_INET6;
+		family = PF_INET6;
 	else if (mask > 0)
-		hints.ai_family = PF_INET;
+		family = PF_INET;
 	else
-		hints.ai_family = PF_UNSPEC;
+		family = PF_UNSPEC;
 
-	if ((ret = getaddrinfo(host, NULL, &hints, &res0)) != 0)
+	if ((ret = my_getaddrinfo(host, family, &res0)) != 0)
 		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
-		    host, gai_strerror(ret));
+		    host, my_gai_strerror(ret));
 
-	for (res = res0; res; res = res->ai_next) {
-		switch (res->ai_family) {
-		case PF_INET:
-				key.dptr = (char *)&(((struct sockaddr_in *) \
-				res->ai_addr)->sin_addr.s_addr);
-				key.dsize = 4;
-				break;
-		case PF_INET6:
-				key.dptr = (char *)((struct sockaddr_in6 *) \
-				res->ai_addr)->sin6_addr.s6_addr;
-				key.dsize = 16;
-				break;
-		default:
-				key.dptr = (char *)res->ai_addr;
-				key.dsize = res->ai_addrlen;
-				break;
-		}
+	for (res = res0; res; res = res->next) {
+		key.dptr = res->addr;
+		key.dsize = res->addrlen;
 		
-		if (getnameinfo(res->ai_addr, res->ai_addrlen, \
-		    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
-			err(EX_OSERR, "can't get numeric address");
+//		if (getnameinfo(res->ai_addr, res->ai_addrlen, \
+//		    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
+//			err(EX_OSERR, "can't get numeric address");
+/* XXX: fix */
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
@@ -446,13 +414,14 @@ handle_rulemod(argc, argv)
 		if (dbm_store(cfgdbp, key, data, flags) == -1)
 			err(EX_OSERR, "can't store record");
 
-		if (vflag)
-			warnx("modified rule for ip %s", buf);
+//		if (vflag)
+//			warnx("modified rule for ip %s", buf);
+/* XXX: fix */
 		
 		found = 1;
 	}
 
-	freeaddrinfo(res0);
+	my_freeaddrinfo(res0);
 
 	if (found == 0)
 		warnx("no suitable records found");
@@ -468,11 +437,12 @@ handle_ruledel(argc, argv)
 	int ch, ret, found = 0;
 	char *host = NULL;
 	datum key, data;
-	struct addrinfo hints, *res, *res0;
+	struct myaddrinfo *res, *res0;
 	hostrule_t *hstent;
 	char *tmp;
 	int mask;
 	char buf[1024];
+	int family;
 
 	while ((ch = getopt(argc, argv, "h:d:v")) != -1) {
 		switch (ch) {
@@ -514,49 +484,34 @@ handle_ruledel(argc, argv)
 	        mask = atoi(tmp);
 	}
 
-	bzero(&hints, sizeof(hints));
-	hints.ai_protocol = IPPROTO_TCP;
-
 	if (mask > 128)
 		errx(EX_USAGE, "invalid mask");
 	else if (mask > 32)
-		hints.ai_family = PF_INET6;
+		family = PF_INET6;
 	else if (mask > 0)
-		hints.ai_family = PF_INET;
+		family = PF_INET;
 	else
-		hints.ai_family = PF_UNSPEC;
+		family = PF_UNSPEC;
 
-	if ((ret = getaddrinfo(host, NULL, &hints, &res0)) != 0)
+	if ((ret = my_getaddrinfo(host, family, &res0)) != 0)
 		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
-		    host, gai_strerror(ret));
+		    host, my_gai_strerror(ret));
 
-	for (res = res0; res; res = res->ai_next) {
-		switch (res->ai_family) {
-		case PF_INET:
-				key.dptr = (char *)&(((struct sockaddr_in *) \
-				res->ai_addr)->sin_addr.s_addr);
-				key.dsize = 4;
-				break;
-		case PF_INET6:
-				key.dptr = (char *)((struct sockaddr_in6 *) \
-				res->ai_addr)->sin6_addr.s6_addr;
-				key.dsize = 16;
-				break;
-		default:
-				key.dptr = (char *)res->ai_addr;
-				key.dsize = res->ai_addrlen;
-				break;
-		}
+	for (res = res0; res; res = res->next) {
+		key.dptr = res->addr;
+		key.dsize = res->addrlen;
 		
-		if (getnameinfo(res->ai_addr, res->ai_addrlen, \
-		    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
-			err(EX_OSERR, "can't get numeric address");
+//		if (getnameinfo(res->ai_addr, res->ai_addrlen, \
+//		    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
+//			err(EX_OSERR, "can't get numeric address");
+/* XXX: fix */
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
-			if (vflag) {
-				warnx("record for address %s not found", buf);
-			}
+//			if (vflag) {
+//				warnx("record for address %s not found", buf);
+//			}
+	/* XXX: fix */
 			continue;
 		}
 		else if (data.dsize != sizeof(*hstent))
@@ -575,7 +530,7 @@ handle_ruledel(argc, argv)
 		found = 1;
 	}
 
-	freeaddrinfo(res0);
+	my_freeaddrinfo(res0);
 
 	if (found == 0)
 		warnx("no suitable records found");
@@ -643,7 +598,10 @@ handle_rulelist(argc, argv)
 
 		default:
 //			get_hex_str(buf, sizeof(buf), key.dptr, key.dsize);
-			errx(EX_OSERR, "not implemented");
+			if (strncmp(key.dptr, DEFRULE, key.dsize) == 0)
+				snprintf(buf, sizeof(buf), "%s", DEFRULE);
+			else
+				errx(EX_OSERR, "not implemented");
 		}
 
 		data = dbm_fetch(cfgdbp, key);
@@ -829,9 +787,12 @@ handle_statlist(argc, argv)
 	printf("<hoststat>\n");
 	for (key = dbm_firstkey(stdbp); key.dptr; key = dbm_nextkey(stdbp)) {
 		data = dbm_fetch(stdbp, key);
-		hstrec = (hostrec_t *)data.dptr;
-		if (hstrec == NULL)
-			err(EX_OSERR, "can't fetch data");
+		if (data.dptr == NULL)
+			err(EX_OSERR, "can't fetch data from %s", stdb);
+		else if (data.dsize != sizeof(*hstrec))
+			errx(EX_DATAERR, "database %s seriously broken", stdb);
+		else
+			hstrec = (hostrec_t *)data.dptr;
 
 		printf("\t<host hostname='%s'>\n", (char *)key.dptr);
 		printf("\t\t<attempts>%ld</attempts>\n", hstrec->num);
