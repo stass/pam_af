@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.h,v 1.2 2005/08/15 16:10:08 stas Exp $
+ * $Id: subr.h,v 1.3 2005/08/15 23:46:41 stas Exp $
  */
 
 typedef struct myaddrinfo {
@@ -61,4 +61,4 @@ void		my_freeaddrinfo 	__P((myaddrinfo_t *mai0));
 const char *	my_gai_strerror		__P((int err));
 int		my_getaddrinfo		__P((char *host,		\
 					     int family,		\
-					     myaddrinfo_t **retmai));
+					     myaddrinfo_t **pmai));

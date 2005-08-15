@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.2 2005/08/15 16:10:08 stas Exp $
+ * $Id: subr.c,v 1.3 2005/08/15 23:46:41 stas Exp $
  */
 
 #include <errno.h>
@@ -87,20 +87,20 @@ my_gai_strerror(err)
 }
 
 int
-my_getaddrinfo(host, family, retmai)
+my_getaddrinfo(host, family, pmai)
 	char	*host;
 	int	family;
-	myaddrinfo_t	**retmai;
+	myaddrinfo_t	**pmai;
 {
 	struct addrinfo hints, *res, *res0;
 	myaddrinfo_t *mai, **last;
 	int ret;
 	
 	if (strncmp(host, DEFRULE, strlen(DEFRULE)) == 0) {
-		*retmai = (myaddrinfo_t *)malloc(sizeof(myaddrinfo_t));
-		if (*retmai == NULL)
+		*pmai = (myaddrinfo_t *)malloc(sizeof(myaddrinfo_t));
+		if (*pmai == NULL)
 			return EAI_MEMORY;
-		mai = *retmai;
+		mai = *pmai;
 		mai->next = NULL;
 		mai->addr = (char *)malloc(strlen(DEFRULE));
 		if (mai->addr == NULL)
@@ -117,11 +117,11 @@ my_getaddrinfo(host, family, retmai)
         if ((ret = getaddrinfo(host, NULL, &hints, &res0)) != 0)
 		return ret;
 
-        for (res = res0, last = retmai; res; res = res->ai_next) {
+        for (res = res0, last = pmai; res; res = res->ai_next) {
 		*last = (myaddrinfo_t *)malloc(sizeof(myaddrinfo_t));
 		mai = *last;
 		if (mai == NULL) {
-			my_freeaddrinfo(*retmai);
+			my_freeaddrinfo(*pmai);
 			return EAI_MEMORY;
 		}
 		mai->next = NULL;
@@ -130,7 +130,7 @@ my_getaddrinfo(host, family, retmai)
                 case PF_INET:
 				mai->addr = (char *)malloc(IPV4SZ);
 				if (mai->addr == NULL) {
-					my_freeaddrinfo(*retmai);
+					my_freeaddrinfo(*pmai);
 					return EAI_MEMORY;
 				}
                                 bcopy(IPV4_ADDR(res->ai_addr), mai->addr, \
@@ -141,7 +141,7 @@ my_getaddrinfo(host, family, retmai)
                 case PF_INET6:
 				mai->addr = (char *)malloc(IPV6SZ);
 				if (mai->addr == NULL) {
-					my_freeaddrinfo(*retmai);
+					my_freeaddrinfo(*pmai);
 					return EAI_MEMORY;
 				}
                                 bcopy(IPV6_ADDR(res->ai_addr), mai->addr, \
@@ -152,7 +152,7 @@ my_getaddrinfo(host, family, retmai)
                 default:
 				mai->addr = (char *)malloc(res->ai_addrlen);
 				if (mai->addr == NULL) {
-					my_freeaddrinfo(*retmai);
+					my_freeaddrinfo(*pmai);
 					return EAI_MEMORY;
 				}
                                 bcopy(res->ai_addr, mai->addr, \
@@ -174,49 +174,26 @@ find_host_rule(dbp, host)
 	char	*host;
 {
 	datum			key, data;
-	struct			addrinfo hints, *res0, *res;
+	struct			myaddrinfo *res0, *res;
 	static hostrule_t	hstent;
 	char			buf[1024];
 	int			found = 0;
 	int			mask;
 	int			ret;
-	void			*addr;
-	size_t			addrlen;
 	char			defrule[] = DEFRULE;
 
-	bzero(&hints, sizeof(hints));
-	hints.ai_protocol = IPPROTO_TCP;
-	hints.ai_family = PF_UNSPEC;
-
-	if ((ret = getaddrinfo(host, NULL, &hints, &res0)) != 0)
+	if ((ret = my_getaddrinfo(host, PF_UNSPEC, &res0)) != 0)
 		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
-		    host, gai_strerror(ret));
+		    host, my_gai_strerror(ret));
 
-	for (res = res0; res && !found; res = res->ai_next) {
-		switch (res->ai_family) {
-		case PF_INET:
-				addr = (char *)&(((struct sockaddr_in *) \
-				res->ai_addr)->sin_addr.s_addr);
-				addrlen = 4;
-				break;
-		case PF_INET6:
-				addr = (char *)((struct sockaddr_in6 *) \
-				res->ai_addr)->sin6_addr.s6_addr;
-				addrlen = 16;
-				break;
-		default:
-				addr = (char *)res->ai_addr;
-				addrlen = res->ai_addrlen;
-				break;
-		}
-
-		if (getnameinfo(res->ai_addr, res->ai_addrlen, \
-		    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
+	for (res = res0; res && !found; res = res->next) {
+		ret = my_getnameinfo(res->addr, res->addrlen, buf, sizeof(buf));
+		if (ret != 0)
 			err(EX_OSERR, "can't get numeric address");
 
 		for (key = dbm_firstkey(dbp); key.dptr; key = dbm_nextkey(dbp))
 		{
-			if ((unsigned)key.dsize != addrlen)
+			if ((unsigned)key.dsize != res->addrlen)
 				continue;
 
 			data = dbm_fetch(dbp, key);
@@ -224,8 +201,9 @@ find_host_rule(dbp, host)
 				errx(EX_DATAERR, "database seriously broken");
 			mask = ((hostrule_t *)data.dptr)->mask;
 			if (mask == 0)
-				mask = addrlen * 8;
-			if (addr_cmp(key.dptr, addr, addrlen, mask) == 0) {
+				mask = res->addrlen * 8;
+			if (addr_cmp(key.dptr, res->addr, res->addrlen, mask) \
+			    == 0) {
 				found = 1;
 				break;
 			}
