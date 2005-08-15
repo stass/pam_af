@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.1 2005/08/15 02:33:36 stas Exp $
+ * $Id: pam_af_tool.c,v 1.2 2005/08/15 13:11:14 stas Exp $
  */
 
 #include <errno.h>
@@ -102,19 +102,20 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: %s\n"					\
-	    "\truleadd -h host -a attempts -t time [-l cmd] "		\
-	    "[-u cmd] [-d file] [-v]\n"					\
-	    "\trulemod -h host [-a attempts] [-t time] [-l cmd] "	\
-	    "[-u cmd] [-d file] [-v]\n"					\
-	    "\truledel -h host [-d file] [-v]\n"			\
-	    "\trulelist [-d file]\n"					\
-	    "\truleflush [-d file] [-v]\n"				\
-	    "\tstatdel -h host [-d file] [-v]\n"			\
-	    "\tstatlist [-d file]\n"					\
-	    "\tstatflush [-d file] [-v]\n"				\
-	    "\tlock [-h host] [-s file] [-r file] [-fv]\n"		\
-	    "\tunlock [-h host] [-s file] [-r file] [-fv]\n", getprogname());
+	fprintf(stderr, "usage:\n"					\
+	    "\t%1$s ruleadd -h host -a attempts -t time"		\
+	    "\n\t\t[-l cmd] [-u cmd] [-d file] [-v]\n"			\
+	    "\t%1$s rulemod -h host [-a attempts] [-t time]"		\
+	    "\n\t\t[-l cmd] [-u cmd] [-d file] [-v]\n"			\
+	    "\t%1$s ruledel -h host [-d file] [-v]\n"			\
+	    "\t%1$s rulelist [-d file]\n"				\
+	    "\t%1$s ruleflush [-d file] [-v]\n"				\
+	    "\t%1$s statdel -h host [-d file] [-v]\n"			\
+	    "\t%1$s statlist [-d file]\n"				\
+	    "\t%1$s statflush [-d file] [-v]\n"				\
+	    "\t%1$s lock [-h host] [-s file] [-r file] [-fv]\n"		\
+	    "\t%1$s unlock [-h host] [-s file] [-r file] [-fv]\n", 	\
+	    getprogname());
 
 	exit(EX_USAGE);
 }
@@ -227,10 +228,6 @@ handle_ruleadd(argc, argv)
 		err(EX_IOERR, "can't open rules database %s",  cfgdb);
 
 	atexit(cleanup);
-
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
 
 	/* Extract mask specification from hostname */
 	hstent.mask = 0;
@@ -372,10 +369,6 @@ handle_rulemod(argc, argv)
 
 	atexit(cleanup);
 
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
-
 	/* Extract mask specification from hostname */
 	mask = 0;
 	if ((tmp = strchr(host, '/')) != NULL) {
@@ -423,13 +416,16 @@ handle_rulemod(argc, argv)
 			err(EX_OSERR, "can't get numeric address");
 
 		data = dbm_fetch(cfgdbp, key);
-		hstent = (hostrule_t *)data.dptr;
-		if (hstent == NULL) {
+		if (data.dptr == NULL) {
 			if (vflag) {
 				warnx("record for address %s not found", buf);
 			}
 			continue;
 		}
+		else if (data.dsize != sizeof(hstent))
+			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
+		else 
+			hstent = (hostrule_t *)data.dptr;
 
 		if (hstent->mask != mask)
 			continue;
@@ -447,9 +443,6 @@ handle_rulemod(argc, argv)
 			hstent->unlock_cmd[MAX_CMD_LEN - 1] = '\0';
 		}
 
-		data.dptr = (char *)hstent;
-		data.dsize = sizeof(*hstent);
-	
 		if (dbm_store(cfgdbp, key, data, flags) == -1)
 			err(EX_OSERR, "can't store record");
 
@@ -513,10 +506,6 @@ handle_ruledel(argc, argv)
 
 	atexit(cleanup);
 
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
-
 	/* Extract mask specification from hostname */
 	mask = 0;
 	if ((tmp = strchr(host, '/')) != NULL) {
@@ -564,13 +553,16 @@ handle_ruledel(argc, argv)
 			err(EX_OSERR, "can't get numeric address");
 
 		data = dbm_fetch(cfgdbp, key);
-		hstent = (hostrule_t *)data.dptr;
-		if (hstent == NULL) {
+		if (data.dptr == NULL) {
 			if (vflag) {
 				warnx("record for address %s not found", buf);
 			}
 			continue;
 		}
+		else if (data.dsize != sizeof(hstent))
+			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
+		else 
+			hstent = (hostrule_t *)data.dptr;
 
 		if (hstent->mask != mask)
 			continue;
@@ -624,10 +616,6 @@ handle_rulelist(argc, argv)
 
 	atexit(cleanup);
 
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
-
 	printf("<hostrules>\n");
 	for (key = dbm_firstkey(cfgdbp); key.dptr; key = dbm_nextkey(cfgdbp)) {
 		switch(key.dsize) {
@@ -654,29 +642,40 @@ handle_rulelist(argc, argv)
 			break;
 
 		default:
-			errx(EX_DATAERR, "database broken");
+//			get_hex_str(buf, sizeof(buf), key.dptr, key.dsize);
+			errx(EX_OSERR, "not implemented");
 		}
 
 		data = dbm_fetch(cfgdbp, key);
-		hstent = (hostrule_t *)data.dptr;
-		if (hstent == NULL)
+		if (data.dptr == NULL) {
 			err(EX_OSERR, "can't fetch data");
+		}
+		else if (data.dsize != sizeof(hstent))
+			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
+		else 
+			hstent = (hostrule_t *)data.dptr;
 
 		if (hstent->mask != 0)
-			printf("<host ip='%s' mask='%d'>\n", buf, hstent->mask);
+			printf("\t<host ip='%s' mask='%d'>\n", buf, hstent->mask);
 		else	
-			printf("<host ip='%s'>\n", buf);
+			printf("\t<host ip='%s'>\n", buf);
+
 		if (hstent->attempts != 0)
-			printf("<attempts>%ld</attempts>\n", hstent->attempts);
+			printf("\t\t<attempts>%ld</attempts>\n", \
+			    hstent->attempts);
 		else
-			printf("<attempts>%s</attempts>\n", UNLIM);
-		printf("<locktime>%lds</locktime>\n", hstent->locktime);
+			printf("\t\t<attempts>%s</attempts>\n", UNLIM);
+
+		printf("\t\t<locktime>%lds</locktime>\n", hstent->locktime);
+
 		if (hstent->lock_cmd != NULL)
-			printf("<lockcmd>%s</lockcmd>\n", hstent->lock_cmd);
+			printf("\t\t<lockcmd>%s</lockcmd>\n", hstent->lock_cmd);
+
 		if (hstent->unlock_cmd != NULL)
-			printf("<unlockcmd>%s</unlockcmd>\n", \
+			printf("\t\t<unlockcmd>%s</unlockcmd>\n", \
 			    hstent->unlock_cmd);
-		printf("</host>\n");
+
+		printf("\t</host>\n");
 	}
 	printf("</hostrules>\n");
 
@@ -718,10 +717,6 @@ handle_ruleflush(argc, argv)
 		err(EX_IOERR, "can't open rules database %s",  cfgdb);
 
 	atexit(cleanup);
-
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
 
 	for (key = dbm_firstkey(cfgdbp); key.dptr; key = dbm_nextkey(cfgdbp)) {
 		ret = dbm_delete(cfgdbp, key);
@@ -780,8 +775,6 @@ handle_statdel(argc, argv)
 
 	atexit(cleanup);
 
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
 	ASSERT(host)
 	key.dptr = host;
 	key.dsize = strlen(host) + 1;
@@ -832,10 +825,6 @@ handle_statlist(argc, argv)
 		err(EX_IOERR, "can't open rules database %s",  stdb);
 
 	atexit(cleanup);
-
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
 
 	printf("<hoststat>\n");
 	for (key = dbm_firstkey(stdbp); key.dptr; key = dbm_nextkey(stdbp)) {
@@ -961,21 +950,19 @@ handle_lock(argc, argv)
 
 	atexit(cleanup);
 
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
-
 	if (host != NULL) {
 		key.dptr = host;
 		key.dsize = strlen(host) + 1;
 		data = dbm_fetch(stdbp, key);
-		hstrec = (hostrec_t *)data.dptr;
-		/* XXX: check dsize value */
+		if (data.dptr == NULL)
+			err(EX_OSERR, "can't fetch data from %s", stdb);
+		else if (data.dsize != sizeof(hstrec))
+			errx(EX_DATAERR, "database %s seriously broken", stdb);
+		else
+			hstrec = (hostrec_t *)data.dptr;
 		/* XXX: report used ip */
 
-		if (hstrec == NULL)
-			err(EX_OSERR, "can't fetch data from %s", stdb);
-
+		/* XXX: let find_host_rule opens base */
 		hstent = find_host_rule(cfgdbp, host);
 		ASSERT(hstent);
 
@@ -989,10 +976,13 @@ handle_lock(argc, argv)
 		for (key = dbm_firstkey(stdbp); key.dptr; \
 		    key = dbm_nextkey(stdbp)) {
 			data = dbm_fetch(stdbp, key);
-			hstrec = (hostrec_t *)data.dptr;
-
-			if (hstrec == NULL)
+			if (data.dptr == NULL)
 				err(EX_OSERR, "can't fetch data from %s", stdb);
+			else if (data.dsize != sizeof(hstrec))
+				errx(EX_DATAERR, "database %s seriously ", \
+				    "broken", stdb);
+			else
+				hstrec = (hostrec_t *)data.dptr;
 
 			hstent = find_host_rule(cfgdbp, key.dptr);
 			ASSERT(hstent);
@@ -1071,12 +1061,13 @@ handle_unlock(argc, argv)
 		key.dptr = host;
 		key.dsize = strlen(host) + 1;
 		data = dbm_fetch(stdbp, key);
-		hstrec = (hostrec_t *)data.dptr;
-		/* XXX: check dsize value */
-		/* XXX: report used ip */
-
-		if (hstrec == NULL)
+		if (data.dptr == NULL)
 			err(EX_OSERR, "can't fetch data from %s", stdb);
+		else if (data.dsize != sizeof(hstrec))
+			errx(EX_DATAERR, "database %s seriously broken", stdb);
+		else
+			hstrec = (hostrec_t *)data.dptr;
+		/* XXX: report used ip */
 
 		hstent = find_host_rule(cfgdbp, host);
 		ASSERT(hstent);
@@ -1091,10 +1082,13 @@ handle_unlock(argc, argv)
 		for (key = dbm_firstkey(stdbp); key.dptr; \
 		    key = dbm_nextkey(stdbp)) {
 			data = dbm_fetch(stdbp, key);
-			hstrec = (hostrec_t *)data.dptr;
-
-			if (hstrec == NULL)
+			if (data.dptr == NULL)
 				err(EX_OSERR, "can't fetch data from %s", stdb);
+			else if (data.dsize != sizeof(hstrec))
+				errx(EX_DATAERR, "database %s seriously ", \
+				    "broken", stdb);
+			else
+				hstrec = (hostrec_t *)data.dptr;
 
 			hstent = find_host_rule(cfgdbp, host);
 			ASSERT(hstent);
