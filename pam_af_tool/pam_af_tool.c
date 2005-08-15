@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.3 2005/08/15 13:15:32 stas Exp $
+ * $Id: pam_af_tool.c,v 1.4 2005/08/15 13:19:06 stas Exp $
  */
 
 #include <errno.h>
@@ -1090,7 +1090,8 @@ handle_unlock(argc, argv)
 			else
 				hstrec = (hostrec_t *)data.dptr;
 
-			hstent = find_host_rule(cfgdbp, host);
+/* XXX: check key.dsize */
+			hstent = find_host_rule(cfgdbp, key.dptr);
 			ASSERT(hstent);
 	
 			if (unlock_host(hstrec, hstent, fflag) == 0) {
