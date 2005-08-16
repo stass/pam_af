@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.3 2005/08/16 00:40:10 stas Exp $
+ * $Id: pam_af.c,v 1.4 2005/08/16 23:46:44 stas Exp $
  */
 
 #include <errno.h>
@@ -151,7 +151,6 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	int update_when_locked = 0; /* Update host stats when it's locked */
 
-	PASS
 	/* Get runtime configuration */
 	if (openpam_get_option(pamh, "allow_on_error") != NULL)
 		pam_err_ret = PAM_SUCCESS; 
@@ -254,7 +253,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		hstr.locked_for = hostent->locktime;
 		pam_ret = PAM_AUTH_ERR;
 		if (strlen(hostent->lock_cmd) > 0) {
-			ret = exec_cmd(hostent->unlock_cmd, env, ebuf, \
+			ret = exec_cmd(hostent->lock_cmd, env, ebuf, \
 			    sizeof(ebuf));
 			if (ret != 0)
 				PAM_AF_LOGERR("error executing locking cmd:" \

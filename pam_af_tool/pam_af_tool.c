@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.6 2005/08/16 00:40:10 stas Exp $
+ * $Id: pam_af_tool.c,v 1.7 2005/08/16 23:46:45 stas Exp $
  */
 
 #include <errno.h>
@@ -267,9 +267,10 @@ handle_ruleadd(argc, argv)
 			continue;
 		}
 		if (vflag) {
-			if (my_getnameinfo(res->addr, res->addrlen, \
+			if (ret = my_getnameinfo(res->addr, res->addrlen, \
 			    buf, sizeof(buf)) != 0)
-				err(EX_OSERR, "can't get numeric address");
+				errx(EX_OSERR, "can't get numeric address: %s",\
+				    gai_strerror(ret));
 			fprintf(stderr, "Stored rule for %s.\n", buf);
 		}
 	}
@@ -377,9 +378,10 @@ handle_rulemod(argc, argv)
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		
-		if (my_getnameinfo(res->addr, res->addrlen, buf, sizeof(buf)) \
-		    != 0)
-			err(EX_OSERR, "can't get numeric address");
+		if (ret = my_getnameinfo(res->addr, res->addrlen, buf, \
+		    sizeof(buf)) != 0)
+			errx(EX_OSERR, "can't get numeric address: %s", \
+			    gai_strerror(ret));
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
@@ -499,9 +501,10 @@ handle_ruledel(argc, argv)
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		
-		if (my_getnameinfo(res->addr, res->addrlen, buf, sizeof(buf)) \
-		    != 0)
-			err(EX_OSERR, "can't get numeric address");
+		if (ret = my_getnameinfo(res->addr, res->addrlen, buf, \
+		    sizeof(buf)) != 0)
+			errx(EX_OSERR, "can't get numeric address: %s", \
+			    gai_strerror(ret));
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
@@ -570,8 +573,10 @@ handle_rulelist(argc, argv)
 	printf("<hostrules>\n");
 	for (key = dbm_firstkey(cfgdbp); key.dptr; key = dbm_nextkey(cfgdbp)) {
 
-		if (my_getnameinfo(key.dptr, key.dsize, buf, sizeof(buf)) != 0)
-			err(EX_OSERR, "can't get numeric address");
+		if (ret = my_getnameinfo(key.dptr, key.dsize, buf, \
+		    sizeof(buf)) != 0)
+			errx(EX_OSERR, "can't get numeric address: %s", \
+			    gai_strerror(ret));
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {

@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.4 2005/08/16 00:40:10 stas Exp $
+ * $Id: subr.c,v 1.5 2005/08/16 23:46:44 stas Exp $
  */
 
 #include <errno.h>
@@ -86,21 +86,25 @@ int my_getnameinfo(addr, addrlen, buf, buflen)
 
 	switch (addrlen) {
 	case IPV4SZ:
+		bzero(&sa, sizeof(sa));
 		sa.sin_family = PF_INET;
 		sa.sin_port = 0;
 		sa.sin_addr.s_addr = *(in_addr_t *)addr;
 
 		sockaddr = (struct sockaddr *)&sa;
 		salen = sizeof(sa);
+		sockaddr->sa_family = PF_INET;
 		break;
 
 	case IPV6SZ:
+		bzero(&sa6, sizeof(sa6));
 		sa6.sin6_family = PF_INET6;
 		sa6.sin6_port = 0;
-		bcopy(addr, sa6.sin6_addr.s6_addr, addrlen);
+		sa6.sin6_addr = *(struct in6_addr *)addr;
 		
 		sockaddr = (struct sockaddr *)&sa6;
 		salen = sizeof(sa6);
+		sockaddr->sa_family = PF_INET6;
 		break;
 
 	default:
@@ -108,7 +112,7 @@ int my_getnameinfo(addr, addrlen, buf, buflen)
 		salen = addrlen;
 	}
 
-	ret = getnameinfo(sockaddr, salen, buf, sizeof(buf), NULL, 0, \
+	ret = getnameinfo(sockaddr, salen, buf, buflen, NULL, 0, \
 	    NI_NUMERICHOST);
 
 	return ret;

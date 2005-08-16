@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.h,v 1.1 2005/08/15 02:33:31 stas Exp $
+ * $Id: pam_af.h,v 1.2 2005/08/16 23:46:44 stas Exp $
  */
 #ifndef _PAM_AF_H_
 #define _PAM_AF_H_
@@ -46,10 +46,12 @@
 	assert(exp);
 # if defined(PAM_AF_DEFS)
 #  define PASS \
-	PAM_AF_LOGERR("pass: %d", __LINE__);
+	PAM_AF_LOGERR("pass: %s ==> %s: %d", __FILE__,		\
+	__FUNCTION__, __LINE__);
 # else
 #   define PASS \
-	fprintf(stderr, "pass: %d\n", __LINE__);
+	fprintf(stderr, "pass: %s ==> %s: %d\n", __FILE__,	\
+	__FUNCTION__, __LINE__);
 # endif
 #else
 # define ASSERT(exp)
@@ -60,7 +62,7 @@ typedef struct hostrec {
 	long	num;
 	long	last_attempt;
 	long	locked_for; /* Time the host blocked for, 0 if not blocked */
-} hostrec_t;
+} __packed hostrec_t;
 
 typedef struct hostrule {
 	int mask;
@@ -68,7 +70,7 @@ typedef struct hostrule {
 	long locktime;
 	char lock_cmd[MAX_CMD_LEN];
 	char unlock_cmd[MAX_CMD_LEN];
-} hostrule_t;
+} __packed hostrule_t;
 #define DEFAULT_ATTEMPTS	0
 #define DEFAULT_LOCKTIME	0
 #define DEFRULE "*"
