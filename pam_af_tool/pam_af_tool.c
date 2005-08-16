@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.5 2005/08/15 16:09:50 stas Exp $
+ * $Id: pam_af_tool.c,v 1.6 2005/08/16 00:40:10 stas Exp $
  */
 
 #include <errno.h>
@@ -267,11 +267,10 @@ handle_ruleadd(argc, argv)
 			continue;
 		}
 		if (vflag) {
-//			if (getnameinfo(res->ai_addr, res->ai_addrlen, \
-//			    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
-//				err(EX_OSERR, "can't get numeric address");
-//			fprintf(stderr, "Stored rule for %s.\n", buf);
-/*	XXX: fix */
+			if (my_getnameinfo(res->addr, res->addrlen, \
+			    buf, sizeof(buf)) != 0)
+				err(EX_OSERR, "can't get numeric address");
+			fprintf(stderr, "Stored rule for %s.\n", buf);
 		}
 	}
 	my_freeaddrinfo(res0);
@@ -378,10 +377,9 @@ handle_rulemod(argc, argv)
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		
-//		if (getnameinfo(res->ai_addr, res->ai_addrlen, \
-//		    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
-//			err(EX_OSERR, "can't get numeric address");
-/* XXX: fix */
+		if (my_getnameinfo(res->addr, res->addrlen, buf, sizeof(buf)) \
+		    != 0)
+			err(EX_OSERR, "can't get numeric address");
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
@@ -501,17 +499,15 @@ handle_ruledel(argc, argv)
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		
-//		if (getnameinfo(res->ai_addr, res->ai_addrlen, \
-//		    buf, sizeof(buf), NULL, 0, NI_NUMERICHOST) != 0)
-//			err(EX_OSERR, "can't get numeric address");
-/* XXX: fix */
+		if (my_getnameinfo(res->addr, res->addrlen, buf, sizeof(buf)) \
+		    != 0)
+			err(EX_OSERR, "can't get numeric address");
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
-//			if (vflag) {
-//				warnx("record for address %s not found", buf);
-//			}
-	/* XXX: fix */
+			if (vflag) {
+				warnx("record for address %s not found", buf);
+			}
 			continue;
 		}
 		else if (data.dsize != sizeof(*hstent))
@@ -573,36 +569,9 @@ handle_rulelist(argc, argv)
 
 	printf("<hostrules>\n");
 	for (key = dbm_firstkey(cfgdbp); key.dptr; key = dbm_nextkey(cfgdbp)) {
-		switch(key.dsize) {
-		case 4:
-			sockaddr.sin_family = PF_INET;
-			sockaddr.sin_port = 0;
-			sockaddr.sin_addr.s_addr = *(in_addr_t *)key.dptr;
 
-			if (getnameinfo((const struct sockaddr *)&sockaddr, \
-			    sizeof(sockaddr), buf, sizeof(buf), NULL, 0, \
-			    NI_NUMERICHOST) != 0)
-				err(EX_OSERR, "can't get numeric address");
-			break;
-
-		case 16:
-			sockaddr6.sin6_family = PF_INET6;
-			sockaddr6.sin6_port = 0;
-			bcopy(key.dptr, sockaddr6.sin6_addr.s6_addr, key.dsize);
-
-			if (getnameinfo((const struct sockaddr *)&sockaddr6, \
-			    sizeof(sockaddr6), buf, sizeof(buf), NULL, 0, \
-			    NI_NUMERICHOST) != 0)
-				err(EX_OSERR, "can't get numeric address");
-			break;
-
-		default:
-//			get_hex_str(buf, sizeof(buf), key.dptr, key.dsize);
-			if (strncmp(key.dptr, DEFRULE, key.dsize) == 0)
-				snprintf(buf, sizeof(buf), "%s", DEFRULE);
-			else
-				errx(EX_OSERR, "not implemented");
-		}
+		if (my_getnameinfo(key.dptr, key.dsize, buf, sizeof(buf)) != 0)
+			err(EX_OSERR, "can't get numeric address");
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
@@ -903,12 +872,6 @@ handle_lock(argc, argv)
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open rules database %s",  stdb);
 
-	/* Open cfg database */
-	cfgdbp = dbm_open(cfgdb, O_RDONLY | O_CREAT, \
-	    CFGDB_PERM);
-	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open config database %s",  cfgdb);
-
 	atexit(cleanup);
 
 	if (host != NULL) {
@@ -924,7 +887,7 @@ handle_lock(argc, argv)
 		/* XXX: report used ip */
 
 		/* XXX: let find_host_rule opens base */
-		hstent = find_host_rule(cfgdbp, host);
+		hstent = find_host_rule(cfgdb, host);
 		ASSERT(hstent);
 
 		if (lock_host(hstrec, hstent, fflag) == 0) {
@@ -945,7 +908,7 @@ handle_lock(argc, argv)
 			else
 				hstrec = (hostrec_t *)data.dptr;
 
-			hstent = find_host_rule(cfgdbp, key.dptr);
+			hstent = find_host_rule(cfgdb, key.dptr);
 			ASSERT(hstent);
 	
 			if (lock_host(hstrec, hstent, fflag) == 0) {
@@ -1006,12 +969,6 @@ handle_unlock(argc, argv)
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open rules database %s",  stdb);
 
-	/* Open cfg database */
-	cfgdbp = dbm_open(cfgdb, O_RDONLY | O_CREAT, \
-	    CFGDB_PERM);
-	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open config database %s",  cfgdb);
-
 	atexit(cleanup);
 
 	/* Clear BDB structures */
@@ -1030,7 +987,7 @@ handle_unlock(argc, argv)
 			hstrec = (hostrec_t *)data.dptr;
 		/* XXX: report used ip */
 
-		hstent = find_host_rule(cfgdbp, host);
+		hstent = find_host_rule(cfgdb, host);
 		ASSERT(hstent);
 
 		if (unlock_host(hstrec, hstent, fflag) == 0) {
@@ -1052,7 +1009,7 @@ handle_unlock(argc, argv)
 				hstrec = (hostrec_t *)data.dptr;
 
 /* XXX: check key.dsize */
-			hstent = find_host_rule(cfgdbp, key.dptr);
+			hstent = find_host_rule(cfgdb, key.dptr);
 			ASSERT(hstent);
 	
 			if (unlock_host(hstrec, hstent, fflag) == 0) {

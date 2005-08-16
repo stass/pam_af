@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.3 2005/08/15 23:46:41 stas Exp $
+ * $Id: subr.c,v 1.4 2005/08/16 00:40:10 stas Exp $
  */
 
 #include <errno.h>
@@ -41,6 +41,7 @@
 #include <paths.h>
 #include <assert.h>
 #include <err.h>
+#include <fcntl.h>
 #include <ndbm.h>
 #include <netdb.h>
 #include <sysexits.h>
@@ -66,6 +67,53 @@ const char *cfgdb = CFGDB;
 #define IPV4SZ sizeof(struct in_addr)
 #define IPV6SZ sizeof(struct in6_addr)
 
+int my_getnameinfo(addr, addrlen, buf, buflen)
+	void	*addr;
+	size_t	addrlen;
+	char	*buf;
+	size_t	buflen;
+{
+	struct sockaddr		*sockaddr;
+	struct sockaddr_in	sa;
+	struct sockaddr_in6	sa6;
+	size_t			salen;
+	int			ret;
+
+	if (strncmp(addr, DEFRULE, addrlen) == 0) {
+		snprintf(buf, buflen, "%s", DEFRULE);
+		return 0;
+	}
+
+	switch (addrlen) {
+	case IPV4SZ:
+		sa.sin_family = PF_INET;
+		sa.sin_port = 0;
+		sa.sin_addr.s_addr = *(in_addr_t *)addr;
+
+		sockaddr = (struct sockaddr *)&sa;
+		salen = sizeof(sa);
+		break;
+
+	case IPV6SZ:
+		sa6.sin6_family = PF_INET6;
+		sa6.sin6_port = 0;
+		bcopy(addr, sa6.sin6_addr.s6_addr, addrlen);
+		
+		sockaddr = (struct sockaddr *)&sa6;
+		salen = sizeof(sa6);
+		break;
+
+	default:
+		sockaddr = (struct sockaddr *)addr;
+		salen = addrlen;
+	}
+
+	ret = getnameinfo(sockaddr, salen, buf, sizeof(buf), NULL, 0, \
+	    NI_NUMERICHOST);
+
+	return ret;
+}
+
 void
 my_freeaddrinfo(mai0)
 	myaddrinfo_t	*mai0;
@@ -80,10 +128,10 @@ my_freeaddrinfo(mai0)
 }
 
 const char *
-my_gai_strerror(err)
-	int err;
+my_gai_strerror(error)
+	int error;
 {
-	return(gai_strerror(err));
+	return(gai_strerror(error));
 }
 
 int
@@ -169,8 +217,8 @@ my_getaddrinfo(host, family, pmai)
 }
  
 hostrule_t *
-find_host_rule(dbp, host)
-	DBM	*dbp;
+find_host_rule(db, host)
+	const char	*db;
 	char	*host;
 {
 	datum			key, data;
@@ -181,6 +229,16 @@ find_host_rule(dbp, host)
 	int			mask;
 	int			ret;
 	char			defrule[] = DEFRULE;
+	DBM			*dbp;
+
+	bzero(&key, sizeof(key));
+	bzero(&data, sizeof(data));
+
+        /* Open cfg database */
+        dbp = dbm_open(db, O_RDONLY | O_CREAT, \
+            CFGDB_PERM);
+        if (dbp == NULL)
+		goto nodb;
 
 	if ((ret = my_getaddrinfo(host, PF_UNSPEC, &res0)) != 0)
 		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
@@ -215,6 +273,7 @@ find_host_rule(dbp, host)
 		data = dbm_fetch(dbp, key);
 	}
 
+nodb:
 	if (data.dptr != NULL) {
 		if (data.dsize != sizeof(hstent))
 			errx(EX_DATAERR, "database seriously broken");
@@ -229,6 +288,7 @@ find_host_rule(dbp, host)
 		*hstent.unlock_cmd = 0;
 	}
 
+	dbm_close(dbp);
 	return &hstent;
 }
 

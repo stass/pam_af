@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.2 2005/08/15 02:33:26 stas Exp $
+ * $Id: pam_af.c,v 1.3 2005/08/16 00:40:10 stas Exp $
  */
 
 #include <errno.h>
@@ -138,7 +138,6 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 {
 	char *host;
 	DBM *stdbp;
-	DBM *cfgdbp;
 	datum key, data;
 	hostrec_t hstr;
 	hostrule_t *hostent;
@@ -172,21 +171,11 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	PAM_AF_LOG("processing host %s", host);
 
-	PASS
 	/* Open statistics database and obtain exclusive lock */
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
 	if (stdbp == NULL) {
 		PAM_AF_LOGERR("can't open statistics database %s: %s", \
 		    stdb, strerror(errno));
-		PAM_RETURN(pam_err_ret);
-	}
-	PASS
-
-	/* Open cfg database, create if not exist */
-	cfgdbp = dbm_open(cfgdb, O_RDONLY | O_CREAT, CFGDB_PERM);
-	if (cfgdbp == NULL) {
-		PAM_AF_LOGERR("can't open configuration database %s: %s", \
-		    cfgdb, strerror(errno));
 		PAM_RETURN(pam_err_ret);
 	}
 
@@ -232,7 +221,6 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		if (update_when_locked == 0) {
 			/* Fast rejection */
 			dbm_close(stdbp);
-			dbm_close(cfgdbp);
 			PAM_RETURN(pam_ret);
 		}
 	}
@@ -240,7 +228,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	hstr.last_attempt = curtime;
 
 	/* Fetch rule for host */
-	hostent = find_host_rule(cfgdbp, host);
+	hostent = find_host_rule(cfgdb, host);
 	ASSERT(hostent);
 
 	/*
@@ -284,7 +272,6 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		PAM_AF_LOGERR("can't update record: %s", strerror(ret));
 
 	dbm_close(stdbp);
-	dbm_close(cfgdbp);
 
 	PAM_RETURN(pam_ret);
 }
