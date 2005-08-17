@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.7 2005/08/17 01:29:02 stas Exp $
+ * $Id: subr.c,v 1.8 2005/08/17 01:46:36 stas Exp $
  */
 
 #include <errno.h>
@@ -86,8 +86,8 @@ int my_getnameinfo(addr, addrlen, buf, buflen)
 	size_t			salen;
 	int			ret;
 
-	ASSERT(addr);
-	ASSERT(buf);
+	ASSERT(addr)
+	ASSERT(buf)
 
 	if (buflen == 0) {
 		*buf = 0;
@@ -165,7 +165,7 @@ my_getaddrinfo(host, family, pmai)
 	myaddrinfo_t *mai, **last;
 	int ret;
 	
-	ASSERT(pmai != NULL);
+	ASSERT(pmai)
 	if (strncmp(host, DEFRULE, strlen(DEFRULE)) == 0) {
 		*pmai = (myaddrinfo_t *)malloc(sizeof(myaddrinfo_t));
 		if (*pmai == NULL)
@@ -279,7 +279,7 @@ find_host_rule(db, host)
 		for (key = dbm_firstkey(dbp); key.dptr; key = dbm_nextkey(dbp))
 		{
 			ASSERT(res->addr)
-			ASSERT(res->addrlen);
+			ASSERT(res->addrlen)
 			if ((unsigned)key.dsize != res->addrlen)
 				continue;
 
@@ -337,44 +337,6 @@ nodb:
 }
 
 int
-lock_host(hstrec, hstent, fflag)
-	hostrec_t	*hstrec;
-	hostrule_t	*hstent;
-	int		fflag;
-{
-
-	if ((hstrec->num >= hstent->attempts && hstent->attempts != 0) || \
-	    fflag != 0) {
-		hstrec->locked_for = hstent->locktime;
-		hstrec->last_attempt = time(NULL);
-		if (hstent->lock_cmd != NULL)
-			exec_cmd(hstent->lock_cmd, NULL);
-		return 0;
-	}
-	
-	return 1;
-}
-
-int
-unlock_host(hstrec, hstent, fflag)
-	hostrec_t	*hstrec;
-	hostrule_t	*hstent;
-	int		fflag;
-{
-
-	if ((hstrec->last_attempt + hstrec->locked_for < time(NULL) || \
-	    fflag != 0) && hstrec->last_attempt != 0) {
-		hstrec->locked_for = 0;
-		if (hstent->unlock_cmd != NULL)
-			exec_cmd(hstent->unlock_cmd, NULL);
-/* XXX: set env */
-		return 0;
-	}
-	
-	return 1;
-}
-
-int
 addr_cmp(addr1, addr2, addrlen, mask)
 	const void	*addr1;
 	const void	*addr2;
@@ -418,8 +380,8 @@ parse_time(str, ptime)
 	register int i;
 	char *p;
 	
-	ASSERT(str);
-	ASSERT(ptime);
+	ASSERT(str)
+	ASSERT(ptime)
 
 	for (i = strtol(str, &p, 0); *p != '\0'; i = strtol(++p, &p, 0)) {
 		if (i <= 0)
@@ -462,6 +424,8 @@ exec_cmd(str, env)
 {
 	int pid, ret = 0, status;
 			
+	ASSERT(str)
+
 	switch (pid = vfork()) {
 	case 0:
 		(void)execle(_PATH_BSHELL, "sh", "-c", str, NULL,

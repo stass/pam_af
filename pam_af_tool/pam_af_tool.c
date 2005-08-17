@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.8 2005/08/16 23:48:51 stas Exp $
+ * $Id: pam_af_tool.c,v 1.9 2005/08/17 01:46:37 stas Exp $
  */
 
 #include <errno.h>
@@ -70,6 +70,12 @@ static void		handle_statlist		__P((int argc, char **argv));
 static void		handle_statflush	__P((int argc, char **argv));
 static void		handle_lock		__P((int argc, char **argv));
 static void		handle_unlock		__P((int argc, char **argv));
+int			lock_host		__P((hostrec_t *hstrec,	\
+						     hostrule_t *hstent,\
+						     int fflag));
+int			unlock_host		__P((hostrec_t *hstrec,	\
+						     hostrule_t *hstent,\
+						     int fflag));
 
 #define UNLIM "unlimited"
 
@@ -1023,4 +1029,42 @@ handle_unlock(argc, argv)
 	}
 
 	exit(EX_OK);
+}
+
+int
+lock_host(hstrec, hstent, fflag)
+	hostrec_t	*hstrec;
+	hostrule_t	*hstent;
+	int		fflag;
+{
+
+	if ((hstrec->num >= hstent->attempts && hstent->attempts != 0) || \
+	    fflag != 0) {
+		hstrec->locked_for = hstent->locktime;
+		hstrec->last_attempt = time(NULL);
+		if (hstent->lock_cmd != NULL)
+			exec_cmd(hstent->lock_cmd, NULL);
+		return 0;
+	}
+	
+	return 1;
+}
+
+int
+unlock_host(hstrec, hstent, fflag)
+	hostrec_t	*hstrec;
+	hostrule_t	*hstent;
+	int		fflag;
+{
+
+	if ((hstrec->last_attempt + hstrec->locked_for < time(NULL) || \
+	    fflag != 0) && hstrec->last_attempt != 0) {
+		hstrec->locked_for = 0;
+		if (hstent->unlock_cmd != NULL)
+			exec_cmd(hstent->unlock_cmd, NULL);
+/* XXX: set env */
+		return 0;
+	}
+	
+	return 1;
 }

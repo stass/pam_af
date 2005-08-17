@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.h,v 1.6 2005/08/17 01:29:02 stas Exp $
+ * $Id: subr.h,v 1.7 2005/08/17 01:46:36 stas Exp $
  */
 
 typedef struct myaddrinfo {
@@ -44,12 +44,6 @@ int		exec_cmd		__P((const char *str, 		\
 					     char * const env[]));	\
 int		parse_time		__P((const char *str,		\
 					     long *ptime));
-int		lock_host		__P((hostrec_t *hstrec,		\
-					     hostrule_t *hstent,	\
-					     int fflag));
-int		unlock_host		__P((hostrec_t *hstrec,		\
-					     hostrule_t *hstent,	\
-					     int fflag));
 hostrule_t *	find_host_rule		__P((const char *db,		\
 					     char *host));
 void		my_freeaddrinfo 	__P((myaddrinfo_t *mai0));
