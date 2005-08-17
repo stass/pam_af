@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.9 2005/08/17 01:46:37 stas Exp $
+ * $Id: pam_af_tool.c,v 1.10 2005/08/17 02:37:46 stas Exp $
  */
 
 #include <errno.h>
@@ -72,10 +72,10 @@ static void		handle_lock		__P((int argc, char **argv));
 static void		handle_unlock		__P((int argc, char **argv));
 int			lock_host		__P((hostrec_t *hstrec,	\
 						     hostrule_t *hstent,\
-						     int fflag));
+						     int force));
 int			unlock_host		__P((hostrec_t *hstrec,	\
 						     hostrule_t *hstent,\
-						     int fflag));
+						     int force));
 
 #define UNLIM "unlimited"
 
@@ -96,8 +96,15 @@ struct {
 	OPER(unlock),
 };
 	
-static int vflag = 0;
-static int fflag = 0;
+#define VFLAG 0x00000001
+#define FFLAG 0x00000002
+#define AFLAG 0x00000004
+#define TFLAG 0x00000008
+#define LFLAG 0x00000010
+#define UFLAG 0x00000020
+#define NFLAG 0x00000040
+#define HFLAG 0x00000080
+
 static DBM *stdbp = NULL;
 static DBM *cfgdbp = NULL;
 
@@ -159,7 +166,7 @@ handle_ruleadd(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, flags = DBM_REPLACE;
+	int ch, ret, dbflags = DBM_REPLACE;
 	char *host = NULL;
 	datum key, data;
 	struct myaddrinfo *res, *res0;
@@ -167,6 +174,7 @@ handle_ruleadd(argc, argv)
 	char *tmp;
 	char buf[1024];
 	int family;
+	int flags = 0;
 
 	bzero(&hstent, sizeof(hstent));
 	hstent.attempts = -1;
@@ -175,13 +183,15 @@ handle_ruleadd(argc, argv)
 	while ((ch = getopt(argc, argv, "h:a:t:l:u:d:nv")) != -1) {
 		switch (ch) {
 		case 'n':
-			flags = DBM_INSERT;
+			dbflags = DBM_INSERT;
+			flags |= NFLAG;
 			break;
 		case 'v':
-			vflag = 1;
+			flags |= VFLAG;
 			break;
 
 		case 'a':
+			flags |= AFLAG;
 			if (strncmp(optarg, UNLIM, strlen(UNLIM)) == 0) {
 				hstent.attempts = 0;
 				break;
@@ -193,20 +203,25 @@ handle_ruleadd(argc, argv)
 			break;
 
 		case 't':
-			if(parse_time(optarg, &hstent.locktime) != 0)
+			flags |= TFLAG;
+			if(parse_time(optarg, &hstent.locktime) != 0 || \
+			    hstent.locktime < 0)
 				errx(EX_DATAERR, "invalid time: %s", optarg);
 			break;
 
 		case 'h':
+			flags |= HFLAG;
 			host = optarg;
 			break;
 
 		case 'l':
+			ASSERT(MAX_CMD_LEN > 0)
 			strncpy(hstent.lock_cmd, optarg, MAX_CMD_LEN);
 			hstent.lock_cmd[MAX_CMD_LEN - 1] = 0;
 			break;
 
 		case 'u':
+			ASSERT(MAX_CMD_LEN > 0)
 			strncpy(hstent.unlock_cmd, optarg, MAX_CMD_LEN);
 			hstent.unlock_cmd[MAX_CMD_LEN - 1] = 0;
 			break;
@@ -221,7 +236,7 @@ handle_ruleadd(argc, argv)
 		}
 	}
 
-	if ((host == NULL) || hstent.attempts < 0 || hstent.locktime < 0)
+	if (!(flags & HFLAG & AFLAG & TFLAG))
 		usage();
 		/* NOTREACHED */
 
@@ -259,17 +274,17 @@ handle_ruleadd(argc, argv)
 		data.dptr = (char *)&hstent;
 		data.dsize = sizeof(hstent);
 	
-		ret = dbm_store(cfgdbp, key, data, flags);
+		ret = dbm_store(cfgdbp, key, data, dbflags);
 		switch (ret) {
 		case -1:
 			err(EX_OSERR, "can't store record");
 			/* NOTREACHED */
 		case 1:
-			if (vflag)
+			if (flags & VFLAG)
 				warnx("ignored duplicate: %s", host);
 			continue;
 		}
-		if (vflag) {
+		if (flags & VFLAG) {
 			if (ret = my_getnameinfo(res->addr, res->addrlen, \
 			    buf, sizeof(buf)) != 0)
 				errx(EX_OSERR, "can't get numeric address: %s",\
@@ -287,7 +302,7 @@ handle_rulemod(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, flags = DBM_REPLACE;
+	int ch, ret, dbflags = DBM_REPLACE;
 	char *host = NULL;
 	datum key, data;
 	struct myaddrinfo *res, *res0;
@@ -299,14 +314,16 @@ handle_rulemod(argc, argv)
 	int found = 0;
 	int mask;
 	int family;
+	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "h:a:t:l:u:d:v")) != -1) {
 		switch (ch) {
 		case 'v':
-			vflag = 1;
+			flags |= VFLAG;
 			break;
 
 		case 'a':
+			flags |= AFLAG;
 			if (strncmp(optarg, UNLIM, strlen(UNLIM)) == 0) {
 				attempts = 0;
 				break;
@@ -318,19 +335,23 @@ handle_rulemod(argc, argv)
 			break;
 
 		case 't':
-			if(parse_time(optarg, &locktime) != 0)
+			flags |= TFLAG;
+			if(parse_time(optarg, &locktime) != 0 || locktime < 0)
 				errx(EX_DATAERR, "invalid time: %s", optarg);
 			break;
 
 		case 'h':
+			flags |= HFLAG;
 			host = optarg;
 			break;
 
 		case 'l':
+			flags |= LFLAG;
 			lockcmd = optarg;
 			break;
 
 		case 'u':
+			flags |= UFLAG;
 			unlockcmd = optarg;
 			break;
 
@@ -344,7 +365,7 @@ handle_rulemod(argc, argv)
 		}
 	}
 
-	if (host == NULL)
+	if (!(flags & HFLAG))
 		usage();
 		/* NOTREACHED */
 
@@ -388,7 +409,7 @@ handle_rulemod(argc, argv)
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
-			if (vflag) {
+			if (flags & VFLAG) {
 				warnx("record for address %s not found", buf);
 			}
 			continue;
@@ -401,23 +422,25 @@ handle_rulemod(argc, argv)
 		if (hstent->mask != mask)
 			continue;
 
-		if (attempts >= 0)
+		if (flags & AFLAG)
 			hstent->attempts = attempts;
-		if (locktime >= 0)
+		if (flags & TFLAG)
 			hstent->locktime = locktime;
-		if (lockcmd != NULL) {
+		if (flags & LFLAG) {
+			ASSERT(MAX_CMD_LEN > 0)
 			strncpy(hstent->lock_cmd, lockcmd, MAX_CMD_LEN);
 			hstent->lock_cmd[MAX_CMD_LEN - 1] = '\0';
 		}
-		if (unlockcmd != NULL) {
+		if (flags & UFLAG) {
+			ASSERT(MAX_CMD_LEN > 0)
 			strncpy(hstent->unlock_cmd, unlockcmd, MAX_CMD_LEN);
 			hstent->unlock_cmd[MAX_CMD_LEN - 1] = '\0';
 		}
 
-		if (dbm_store(cfgdbp, key, data, flags) == -1)
+		if (dbm_store(cfgdbp, key, data, dbflags) == -1)
 			err(EX_OSERR, "can't store record");
 
-//		if (vflag)
+//		if (flags & VFLAG)
 //			warnx("modified rule for ip %s", buf);
 /* XXX: fix */
 		
@@ -446,14 +469,16 @@ handle_ruledel(argc, argv)
 	int mask;
 	char buf[1024];
 	int family;
+	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "h:d:v")) != -1) {
 		switch (ch) {
 		case 'v':
-			vflag = 1;
+			flags |= VFLAG;
 			break;
 
 		case 'h':
+			flags |= HFLAG;
 			host = optarg;
 			break;
 
@@ -467,7 +492,7 @@ handle_ruledel(argc, argv)
 		}
 	}
 
-	if (host == NULL)
+	if (!(flags & HFLAG))
 		usage();
 		/* NOTREACHED */
 
@@ -511,7 +536,7 @@ handle_ruledel(argc, argv)
 
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
-			if (vflag) {
+			if (flags & VFLAG) {
 				warnx("record for address %s not found", buf);
 			}
 			continue;
@@ -527,7 +552,7 @@ handle_ruledel(argc, argv)
 		if (dbm_delete(cfgdbp, key) != 0)
 			errx(EX_OSERR, "can't delete record for %s", buf);
 
-		if (vflag)
+		if (flags & VFLAG)
 			fprintf(stderr, "Deleted %s.\n", buf);
 		found = 1;
 	}
@@ -628,6 +653,7 @@ handle_ruleflush(argc, argv)
 	hostrule_t hstent;
 	char *tmp;
 	char buf[1024];
+	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "d:v")) != -1) {
 		switch (ch) {
@@ -636,7 +662,7 @@ handle_ruleflush(argc, argv)
 			break;
 
 		case 'v':
-			vflag = 1;
+			flags |= VFLAG;
 			break;
 
 		default:
@@ -660,7 +686,7 @@ handle_ruleflush(argc, argv)
 		i++;
 	}
 
-	if (vflag)
+	if (flags & VFLAG)
 		fprintf(stderr, "%d records flushed\n",i); 
 
 	exit(EX_OK);
@@ -677,6 +703,7 @@ handle_statdel(argc, argv)
 	char *host = NULL;
 	char *tmp;
 	char buf[1024];
+	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "d:h:v")) != -1) {
 		switch (ch) {
@@ -685,11 +712,12 @@ handle_statdel(argc, argv)
 			break;
 
 		case 'h':
+			flags |= HFLAG;
 			host = optarg;
 			break;
 
 		case 'v':
-			vflag = 1;
+			flags |= VFLAG;
 			break;
 
 		default:
@@ -698,7 +726,7 @@ handle_statdel(argc, argv)
 		}
 	}
 
-	if (host == NULL)
+	if (!(flags & HFLAG))
 		usage();
 		/* NOTREACHED */
 
@@ -719,11 +747,11 @@ handle_statdel(argc, argv)
 	case -1:
 		err(EX_OSERR, "can't delete record");
 	case 1:
-		if (vflag)
+		if (flags & VFLAG)
 			fprintf(stderr, "Record not found.\n");
 	}
 	
-	if (vflag)
+	if (flags & VFLAG)
 		fprintf(stderr, "Deleted.\n");
 
 
@@ -795,11 +823,12 @@ handle_statflush(argc, argv)
 	hostrec_t hstrec;
 	char *tmp;
 	char buf[1024];
+	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "vd:")) != -1) {
 		switch (ch) {
 		case 'v':
-			vflag = 1;
+			flags |= VFLAG;
 			break;
 
 		case 'd':
@@ -827,7 +856,7 @@ handle_statflush(argc, argv)
 		i++;
 	}
 
-	if (vflag)
+	if (flags & VFLAG)
 		fprintf(stderr, "%d records flushed\n", i); 
 
 	exit(EX_OK);
@@ -845,19 +874,21 @@ handle_lock(argc, argv)
 	char *tmp;
 	char *host = NULL;
 	char buf[1024];
+	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "h:s:r:fv")) != -1) {
 		switch (ch) {
 		case 'h':
+			flags |= HFLAG;
 			host = optarg;
 			break;
 
 		case 'v':
-			vflag = 1;
+			flags |= VFLAG;
 			break;
 
 		case 'f':
-			fflag = 1;
+			flags |= FFLAG;
 			break;
 
 		case 's':
@@ -882,7 +913,7 @@ handle_lock(argc, argv)
 
 	atexit(cleanup);
 
-	if (host != NULL) {
+	if (flags & HFLAG) {
 		key.dptr = host;
 		key.dsize = strlen(host) + 1;
 		data = dbm_fetch(stdbp, key);
@@ -898,7 +929,7 @@ handle_lock(argc, argv)
 		hstent = find_host_rule(cfgdb, host);
 		ASSERT(hstent);
 
-		if (lock_host(hstrec, hstent, fflag) == 0) {
+		if (lock_host(hstrec, hstent, flags & FFLAG) == 0) {
 			ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 			if (ret != 0)
 				err(EX_OSERR, "can't store record");
@@ -919,7 +950,7 @@ handle_lock(argc, argv)
 			hstent = find_host_rule(cfgdb, key.dptr);
 			ASSERT(hstent);
 	
-			if (lock_host(hstrec, hstent, fflag) == 0) {
+			if (lock_host(hstrec, hstent, flags & FFLAG) == 0) {
 				ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 				if (ret != 0)
 					err(EX_OSERR, "can't store record");
@@ -942,19 +973,21 @@ handle_unlock(argc, argv)
 	char *tmp;
 	char *host = NULL;
 	char buf[1024];
+	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "h:s:r:fv")) != -1) {
 		switch (ch) {
 		case 'h':
+			flags |= HFLAG;
 			host = optarg;
 			break;
 
 		case 'v':
-			vflag = 1;
+			flags |= VFLAG;
 			break;
 
 		case 'f':
-			fflag = 1;
+			flags |= FFLAG;
 			break;
 
 		case 's':
@@ -983,7 +1016,7 @@ handle_unlock(argc, argv)
 	bzero(&key, sizeof(key));
 	bzero(&data, sizeof(data));
 
-	if (host != NULL) {
+	if (flags & HFLAG) {
 		key.dptr = host;
 		key.dsize = strlen(host) + 1;
 		data = dbm_fetch(stdbp, key);
@@ -998,7 +1031,7 @@ handle_unlock(argc, argv)
 		hstent = find_host_rule(cfgdb, host);
 		ASSERT(hstent);
 
-		if (unlock_host(hstrec, hstent, fflag) == 0) {
+		if (unlock_host(hstrec, hstent, flags & FFLAG) == 0) {
 			ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 			if (ret != 0)
 				err(EX_OSERR, "can't store record");
@@ -1020,7 +1053,7 @@ handle_unlock(argc, argv)
 			hstent = find_host_rule(cfgdb, key.dptr);
 			ASSERT(hstent);
 	
-			if (unlock_host(hstrec, hstent, fflag) == 0) {
+			if (unlock_host(hstrec, hstent, flags & FFLAG) == 0) {
 				ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 				if (ret != 0)
 					err(EX_OSERR, "can't store record");
@@ -1032,14 +1065,14 @@ handle_unlock(argc, argv)
 }
 
 int
-lock_host(hstrec, hstent, fflag)
+lock_host(hstrec, hstent, force)
 	hostrec_t	*hstrec;
 	hostrule_t	*hstent;
-	int		fflag;
+	int		force;
 {
 
 	if ((hstrec->num >= hstent->attempts && hstent->attempts != 0) || \
-	    fflag != 0) {
+	    force != 0) {
 		hstrec->locked_for = hstent->locktime;
 		hstrec->last_attempt = time(NULL);
 		if (hstent->lock_cmd != NULL)
@@ -1051,14 +1084,14 @@ lock_host(hstrec, hstent, fflag)
 }
 
 int
-unlock_host(hstrec, hstent, fflag)
+unlock_host(hstrec, hstent, force)
 	hostrec_t	*hstrec;
 	hostrule_t	*hstent;
-	int		fflag;
+	int		force;
 {
 
 	if ((hstrec->last_attempt + hstrec->locked_for < time(NULL) || \
-	    fflag != 0) && hstrec->last_attempt != 0) {
+	    force != 0) && hstrec->last_attempt != 0) {
 		hstrec->locked_for = 0;
 		if (hstent->unlock_cmd != NULL)
 			exec_cmd(hstent->unlock_cmd, NULL);
