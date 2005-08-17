@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.11 2005/08/17 14:21:04 stas Exp $
+ * $Id: pam_af_tool.c,v 1.12 2005/08/17 14:44:40 stas Exp $
  */
 
 #include <errno.h>
@@ -111,21 +111,22 @@ static DBM *cfgdbp = NULL;
 static void
 usage(void)
 {
+	const char *prog = getprogname();
 
 	(void)fprintf(stderr, "usage:\n"				\
-	    "\t%1$s ruleadd -h host -a attempts -t time"		\
+	    "\t%s ruleadd -h host -a attempts -t time"		\
 	    "\n\t\t[-l cmd] [-u cmd] [-d file] [-v]\n"			\
-	    "\t%1$s rulemod -h host [-a attempts] [-t time]"		\
+	    "\t%s rulemod -h host [-a attempts] [-t time]"		\
 	    "\n\t\t[-l cmd] [-u cmd] [-d file] [-v]\n"			\
-	    "\t%1$s ruledel -h host [-d file] [-v]\n"			\
-	    "\t%1$s rulelist [-d file]\n"				\
-	    "\t%1$s ruleflush [-d file] [-v]\n"				\
-	    "\t%1$s statdel -h host [-d file] [-v]\n"			\
-	    "\t%1$s statlist [-d file]\n"				\
-	    "\t%1$s statflush [-d file] [-v]\n"				\
-	    "\t%1$s lock [-h host] [-s file] [-r file] [-fv]\n"		\
-	    "\t%1$s unlock [-h host] [-s file] [-r file] [-fv]\n", 	\
-	    getprogname());
+	    "\t%s ruledel -h host [-d file] [-v]\n"			\
+	    "\t%s rulelist [-d file]\n"				\
+	    "\t%s ruleflush [-d file] [-v]\n"				\
+	    "\t%s statdel -h host [-d file] [-v]\n"			\
+	    "\t%s statlist [-d file]\n"				\
+	    "\t%s statflush [-d file] [-v]\n"				\
+	    "\t%s lock [-h host] [-s file] [-r file] [-fv]\n"		\
+	    "\t%s unlock [-h host] [-s file] [-r file] [-fv]\n", 	\
+	    prog, prog, prog, prog, prog, prog, prog, prog, prog, prog);
 
 	exit(EX_USAGE);
 }
@@ -284,8 +285,8 @@ handle_ruleadd(argc, argv)
 			continue;
 		}
 		if (flags & VFLAG) {
-			if (ret = my_getnameinfo(res->addr, res->addrlen, \
-			    buf, sizeof(buf)) != 0)
+			if ((ret = my_getnameinfo(res->addr, res->addrlen, \
+			    buf, sizeof(buf))) != 0)
 				errx(EX_OSERR, "can't get numeric address: %s",\
 				    gai_strerror(ret));
 			(void)fprintf(stderr, "Stored rule for %s.\n", buf);
@@ -306,8 +307,8 @@ handle_rulemod(argc, argv)
 	datum key, data;
 	struct myaddrinfo *res, *res0;
 	hostrule_t *hstent;
-	long attempts, locktime;
-	char *lockcmd, *unlockcmd;
+	long attempts = 0, locktime = 0; /* Avoid compiler warnings */
+	char *lockcmd = NULL, *unlockcmd = NULL; /* Avoid compiler warnings */
 	char buf[1024];
 	char *tmp;
 	int found = 0;
@@ -402,8 +403,8 @@ handle_rulemod(argc, argv)
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		
-		if (ret = my_getnameinfo(res->addr, res->addrlen, buf, \
-		    sizeof(buf)) != 0)
+		if ((ret = my_getnameinfo(res->addr, res->addrlen, buf, \
+		    sizeof(buf))) != 0)
 			errx(EX_OSERR, "can't get numeric address: %s", \
 			    gai_strerror(ret));
 
@@ -532,8 +533,8 @@ handle_ruledel(argc, argv)
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		
-		if (ret = my_getnameinfo(res->addr, res->addrlen, buf, \
-		    sizeof(buf)) != 0)
+		if ((ret = my_getnameinfo(res->addr, res->addrlen, buf, \
+		    sizeof(buf))) != 0)
 			errx(EX_OSERR, "can't get numeric address: %s", \
 			    gai_strerror(ret));
 
@@ -573,12 +574,9 @@ handle_rulelist(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, found = 0;
+	int ch, ret;
 	datum key, data;
 	hostrule_t *hstent;
-	struct sockaddr_in sockaddr;
-	struct sockaddr_in6 sockaddr6;
-	char *tmp;
 	char buf[1024];
 
 	while ((ch = getopt(argc, argv, "d:")) != -1) {
@@ -604,8 +602,8 @@ handle_rulelist(argc, argv)
 	printf("<hostrules>\n");
 	for (key = dbm_firstkey(cfgdbp); key.dptr; key = dbm_nextkey(cfgdbp)) {
 
-		if (ret = my_getnameinfo(key.dptr, key.dsize, buf, \
-		    sizeof(buf)) != 0)
+		if ((ret = my_getnameinfo(key.dptr, key.dsize, buf, \
+		    sizeof(buf))) != 0)
 			errx(EX_OSERR, "can't get numeric address: %s", \
 			    gai_strerror(ret));
 
@@ -654,10 +652,7 @@ handle_ruleflush(argc, argv)
 	char	*argv[];
 {
 	int ch, ret, i = 0;
-	datum key, data;
-	hostrule_t hstent;
-	char *tmp;
-	char buf[1024];
+	datum key;
 	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "d:v")) != -1) {
@@ -702,12 +697,9 @@ handle_statdel(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, i = 0;
-	datum key, data;
-	hostrule_t hstent;
+	int ch, ret;
+	datum key;
 	char *host = NULL;
-	char *tmp;
-	char buf[1024];
 	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "d:h:v")) != -1) {
@@ -767,11 +759,9 @@ handle_statlist(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, found = 0;
+	int ch;
 	datum key, data;
 	hostrec_t *hstrec;
-	char *tmp;
-	char buf[1024];
 	char *tstr;
 
 	while ((ch = getopt(argc, argv, "d:")) != -1) {
@@ -826,10 +816,7 @@ handle_statflush(argc, argv)
 	char	*argv[];
 {
 	int ch, ret, i = 0;
-	datum key, data;
-	hostrec_t hstrec;
-	char *tmp;
-	char buf[1024];
+	datum key;
 	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "vd:")) != -1) {
@@ -874,13 +861,11 @@ handle_lock(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, i = 0;
+	int ch, ret;
 	datum key, data;
 	hostrec_t *hstrec;
 	hostrule_t *hstent;
-	char *tmp;
 	char *host = NULL;
-	char buf[1024];
 	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "h:s:r:fv")) != -1) {
@@ -972,13 +957,11 @@ handle_unlock(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, i = 0;
+	int ch, ret;
 	datum key, data;
 	hostrec_t *hstrec;
 	hostrule_t *hstent;
-	char *tmp;
 	char *host = NULL;
-	char buf[1024];
 	int flags = 0;
 
 	while ((ch = getopt(argc, argv, "h:s:r:fv")) != -1) {
