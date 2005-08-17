@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.7 2005/08/17 01:29:02 stas Exp $
+ * $Id: pam_af.c,v 1.8 2005/08/17 12:41:16 stas Exp $
  */
 
 #include <errno.h>
@@ -257,6 +257,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		PAM_AF_LOGERR("can't update record: %s", strerror(ret));
 
 	dbm_close(stdbp);
+	openpam_free_envlist(env);
 
 	PAM_RETURN(pam_ret);
 }
