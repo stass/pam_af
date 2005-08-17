@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.12 2005/08/17 14:44:40 stas Exp $
+ * $Id: pam_af_tool.c,v 1.13 2005/08/17 16:51:20 stas Exp $
  */
 
 #include <errno.h>
@@ -55,8 +55,8 @@
 #include "pam_af.h"
 #include "subr.h"
 
-const char *cfgdb = CFGDB;
-const char *stdb = STATDB;
+static const char *cfgdb = CFGDB;
+static const char *stdb = STATDB;
 
 static void		usage			__P((void));
 int			main			__P((int argc, char **argv));
@@ -70,11 +70,13 @@ static void		handle_statlist		__P((int argc, char **argv));
 static void		handle_statflush	__P((int argc, char **argv));
 static void		handle_lock		__P((int argc, char **argv));
 static void		handle_unlock		__P((int argc, char **argv));
-int			lock_host		__P((hostrec_t *hstrec,	\
-						     hostrule_t *hstent,\
+int			lock_host		__P((const char *host, \
+						     hostrec_t *hstrec,	\
+						     const hostrule_t *hstent, \
 						     int force));
-int			unlock_host		__P((hostrec_t *hstrec,	\
-						     hostrule_t *hstent,\
+int			unlock_host		__P((const char *host, \
+						     hostrec_t *hstrec,	\
+						     const hostrule_t *hstent, \
 						     int force));
 
 #define UNLIM "unlimited"
@@ -95,6 +97,7 @@ struct {
 	OPER(lock),
 	OPER(unlock),
 };
+#define NOPS (sizeof(ops) / sizeof(*ops))
 	
 #define VFLAG 0x00000001
 #define FFLAG 0x00000002
@@ -111,7 +114,7 @@ static DBM *cfgdbp = NULL;
 static void
 usage(void)
 {
-	const char *prog = getprogname();
+	const char	*prog = getprogname();
 
 	(void)fprintf(stderr, "usage:\n"				\
 	    "\t%s ruleadd -h host -a attempts -t time"		\
@@ -133,17 +136,16 @@ usage(void)
 
 int
 main(argc, argv)
-	int argc;
-	char *argv[];
+	int	argc;
+	char	*argv[];
 {
-	int nops = sizeof(ops) / sizeof(*ops);
-	register int i;
+	unsigned int	i;
 	
 	if (argc < 2)
 		usage();
 		/* NOTREACHED */
 	
-	for (i = 0; i < nops; i++)
+	for (i = 0; i < NOPS; i++)
 		if (strncmp(ops[i].op, argv[1], strlen(ops[i].op)) == 0)
 			ops[i].handler(--argc, ++argv);
 	
@@ -167,7 +169,7 @@ handle_ruleadd(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, dbflags = DBM_REPLACE;
+	int ch, ret, dbflags;
 	char *host = NULL;
 	datum key, data;
 	struct myaddrinfo *res, *res0;
@@ -239,11 +241,13 @@ handle_ruleadd(argc, argv)
 		usage();
 		/* NOTREACHED */
 
+	dbflags = flags & NFLAG ? DBM_INSERT : DBM_REPLACE;
+
 	/* Open rules database */
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_CREAT | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  cfgdb);
+		err(EX_IOERR, "can't open database %s",  cfgdb);
 
 	atexit(cleanup);
 
@@ -256,7 +260,7 @@ handle_ruleadd(argc, argv)
 	}
 
 	if (hstent.mask > 128)
-		errx(EX_USAGE, "invalid mask");
+		errx(EX_DATAERR, "invalid mask: %d", hstent.mask);
 	else if (hstent.mask > 32)
 		family = PF_INET6;
 	else if (hstent.mask > 0)
@@ -267,6 +271,7 @@ handle_ruleadd(argc, argv)
 	if ((ret = my_getaddrinfo(host, family, &res0)) != 0)
 		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
 		    host, my_gai_strerror(ret));
+
 	for (res = res0; res; res = res->next) {
 		ASSERT(res->addr);
 		key.dptr = res->addr;
@@ -373,7 +378,7 @@ handle_rulemod(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  cfgdb);
+		err(EX_IOERR, "can't open database %s",  cfgdb);
 
 	atexit(cleanup);
 
@@ -386,7 +391,7 @@ handle_rulemod(argc, argv)
 	}
 
 	if (mask > 128)
-		errx(EX_USAGE, "invalid mask");
+		errx(EX_DATAERR, "invalid mask: %d", mask);
 	else if (mask > 32)
 		family = PF_INET6;
 	else if (mask > 0)
@@ -445,7 +450,7 @@ handle_rulemod(argc, argv)
 			err(EX_OSERR, "can't store record");
 
 		if (flags & VFLAG)
-			warnx("modified rule for ip %s", buf);
+			fprintf(stderr, "Modified rule for '%s'.\n", buf);
 		
 		found = 1;
 	}
@@ -503,7 +508,7 @@ handle_ruledel(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  cfgdb);
+		err(EX_IOERR, "can't open database %s",  cfgdb);
 
 	atexit(cleanup);
 
@@ -516,7 +521,7 @@ handle_ruledel(argc, argv)
 	}
 
 	if (mask > 128)
-		errx(EX_USAGE, "invalid mask");
+		errx(EX_DATAERR, "invalid mask: %d", mask);
 	else if (mask > 32)
 		family = PF_INET6;
 	else if (mask > 0)
@@ -557,7 +562,7 @@ handle_ruledel(argc, argv)
 			errx(EX_OSERR, "can't delete record for %s", buf);
 
 		if (flags & VFLAG)
-			(void)fprintf(stderr, "Deleted %s.\n", buf);
+			(void)fprintf(stderr, "Deleted rule for %s.\n", buf);
 		found = 1;
 	}
 
@@ -595,7 +600,7 @@ handle_rulelist(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDONLY, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  cfgdb);
+		err(EX_IOERR, "can't open database %s",  cfgdb);
 
 	atexit(cleanup);
 
@@ -675,7 +680,7 @@ handle_ruleflush(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  cfgdb);
+		err(EX_IOERR, "can't open database %s",  cfgdb);
 
 	atexit(cleanup);
 
@@ -687,7 +692,7 @@ handle_ruleflush(argc, argv)
 	}
 
 	if (flags & VFLAG)
-		(void)fprintf(stderr, "%d records flushed\n",i); 
+		(void)fprintf(stderr, "%d records flushed.\n",i); 
 
 	exit(EX_OK);
 }
@@ -731,7 +736,7 @@ handle_statdel(argc, argv)
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  stdb);
+		err(EX_IOERR, "can't open database %s",  stdb);
 
 	atexit(cleanup);
 
@@ -743,8 +748,7 @@ handle_statdel(argc, argv)
 	case -1:
 		err(EX_OSERR, "can't delete record");
 	case 1:
-		if (flags & VFLAG)
-			(void)fprintf(stderr, "Record not found.\n");
+		warnx("record not found");
 	}
 	
 	if (flags & VFLAG)
@@ -780,7 +784,7 @@ handle_statlist(argc, argv)
 	stdbp = dbm_open(stdb, O_RDONLY, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  stdb);
+		err(EX_IOERR, "can't open database %s",  stdb);
 
 	atexit(cleanup);
 
@@ -839,7 +843,7 @@ handle_statflush(argc, argv)
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  stdb);
+		err(EX_IOERR, "can't open database %s",  stdb);
 
 	atexit(cleanup);
 
@@ -851,7 +855,7 @@ handle_statflush(argc, argv)
 	}
 
 	if (flags & VFLAG)
-		(void)fprintf(stderr, "%d records flushed\n", i); 
+		(void)fprintf(stderr, "%d records deleted.\n", i); 
 
 	exit(EX_OK);
 }
@@ -863,7 +867,7 @@ handle_lock(argc, argv)
 {
 	int ch, ret;
 	datum key, data;
-	hostrec_t *hstrec;
+	hostrec_t hstrec;
 	hostrule_t *hstent;
 	char *host = NULL;
 	int flags = 0;
@@ -898,10 +902,10 @@ handle_lock(argc, argv)
 	}
 
 	/* Open rules database */
-	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, \
+	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  stdb);
+		err(EX_IOERR, "can't open database %s",  stdb);
 
 	atexit(cleanup);
 
@@ -911,19 +915,21 @@ handle_lock(argc, argv)
 		data = dbm_fetch(stdbp, key);
 		if (data.dptr == NULL)
 			err(EX_OSERR, "can't fetch data from %s", stdb);
-		else if (data.dsize != sizeof(*hstrec))
+		else if (data.dsize != sizeof(hstrec))
 			errx(EX_DATAERR, "database %s seriously broken", stdb);
 		else
-			hstrec = (hostrec_t *)data.dptr;
-		/* XXX: report used ip */
+			bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
 		hstent = find_host_rule(cfgdb, host);
 		ASSERT(hstent);
 
-		if (lock_host(hstrec, hstent, flags & FFLAG) == 0) {
+		if (lock_host(host, &hstrec, hstent, flags & FFLAG) == 0) {
+			data.dptr = (char *)&hstrec;
 			ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 			if (ret != 0)
 				err(EX_OSERR, "can't store record");
+			if (flags & VFLAG)
+				fprintf(stderr, "Host '%s' locked.\n", host);
 		}
 	}
 	else {
@@ -932,19 +938,24 @@ handle_lock(argc, argv)
 			data = dbm_fetch(stdbp, key);
 			if (data.dptr == NULL)
 				err(EX_OSERR, "can't fetch data from %s", stdb);
-			else if (data.dsize != sizeof(*hstrec))
+			else if (data.dsize != sizeof(hstrec))
 				errx(EX_DATAERR, "database %s seriously " \
 				    "broken", stdb);
 			else
-				hstrec = (hostrec_t *)data.dptr;
+				bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
 			hstent = find_host_rule(cfgdb, key.dptr);
 			ASSERT(hstent);
 	
-			if (lock_host(hstrec, hstent, flags & FFLAG) == 0) {
+			if (lock_host(key.dptr, &hstrec, hstent, flags & \
+			    FFLAG) == 0) {
+				data.dptr = (char *)&hstrec;
 				ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 				if (ret != 0)
 					err(EX_OSERR, "can't store record");
+				if (flags & VFLAG)
+					fprintf(stderr, "Host '%s' locked.\n", \
+					    key.dptr);
 			}
 		}
 	}
@@ -959,7 +970,7 @@ handle_unlock(argc, argv)
 {
 	int ch, ret;
 	datum key, data;
-	hostrec_t *hstrec;
+	hostrec_t hstrec;
 	hostrule_t *hstent;
 	char *host = NULL;
 	int flags = 0;
@@ -994,16 +1005,12 @@ handle_unlock(argc, argv)
 	}
 
 	/* Open rules database */
-	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, \
+	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open rules database %s",  stdb);
+		err(EX_IOERR, "can't open database %s",  stdb);
 
 	atexit(cleanup);
-
-	/* Clear BDB structures */
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
 
 	if (flags & HFLAG) {
 		key.dptr = host;
@@ -1011,19 +1018,21 @@ handle_unlock(argc, argv)
 		data = dbm_fetch(stdbp, key);
 		if (data.dptr == NULL)
 			err(EX_OSERR, "can't fetch data from %s", stdb);
-		else if (data.dsize != sizeof(*hstrec))
+		else if (data.dsize != sizeof(hstrec))
 			errx(EX_DATAERR, "database %s seriously broken", stdb);
 		else
-			hstrec = (hostrec_t *)data.dptr;
-		/* XXX: report used ip */
+			bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
 		hstent = find_host_rule(cfgdb, host);
 		ASSERT(hstent);
 
-		if (unlock_host(hstrec, hstent, flags & FFLAG) == 0) {
+		if (unlock_host(host, &hstrec, hstent, flags & FFLAG) == 0) {
+			data.dptr = (char *)&hstrec;
 			ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 			if (ret != 0)
 				err(EX_OSERR, "can't store record");
+			if (flags & VFLAG)
+				fprintf(stderr, "Host '%s' unlocked.\n", host);
 		}
 	}
 	else {
@@ -1032,19 +1041,24 @@ handle_unlock(argc, argv)
 			data = dbm_fetch(stdbp, key);
 			if (data.dptr == NULL)
 				err(EX_OSERR, "can't fetch data from %s", stdb);
-			else if (data.dsize != sizeof(*hstrec))
+			else if (data.dsize != sizeof(hstrec))
 				errx(EX_DATAERR, "database %s seriously " \
 				    "broken", stdb);
 			else
-				hstrec = (hostrec_t *)data.dptr;
+				bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
 			hstent = find_host_rule(cfgdb, key.dptr);
 			ASSERT(hstent);
 	
-			if (unlock_host(hstrec, hstent, flags & FFLAG) == 0) {
+			if (unlock_host(key.dptr, &hstrec, hstent, flags & \
+			    FFLAG) == 0) {
+				data.dptr = (char *)&hstrec;
 				ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 				if (ret != 0)
 					err(EX_OSERR, "can't store record");
+				if (flags & VFLAG)
+					fprintf(stderr, "Host '%s' unlocked." \
+					    "\n", key.dptr);
 			}
 		}
 	}
@@ -1053,19 +1067,24 @@ handle_unlock(argc, argv)
 }
 
 int
-lock_host(hstrec, hstent, force)
-	hostrec_t	*hstrec;
-	hostrule_t	*hstent;
-	int		force;
+lock_host(host, hstrec, hstent, force)
+	const char		*host;
+	hostrec_t		*hstrec;
+	const hostrule_t	*hstent;
+	int			force;
 {
+	char *env[2];
+
+	if (asprintf(&env[0], "PAM_RHOST=%s", host) < 0)
+		err(EX_OSERR, "malloc()");
+	env[1] = NULL;
 
 	if ((hstrec->num >= hstent->attempts && hstent->attempts != 0) || \
 	    force != 0) {
 		hstrec->locked_for = hstent->locktime;
 		hstrec->last_attempt = time(NULL);
 		if (hstent->lock_cmd != NULL)
-/* XXX: set env */
-			exec_cmd(hstent->lock_cmd, NULL);
+			exec_cmd(hstent->lock_cmd, env);
 		return 0;
 	}
 	
@@ -1073,18 +1092,24 @@ lock_host(hstrec, hstent, force)
 }
 
 int
-unlock_host(hstrec, hstent, force)
-	hostrec_t	*hstrec;
-	hostrule_t	*hstent;
-	int		force;
+unlock_host(host, hstrec, hstent, force)
+	const char		*host;
+	hostrec_t		*hstrec;
+	const hostrule_t	*hstent;
+	int			force;
 {
+	char *env[2];
+
+	if (asprintf(&env[0], "PAM_RHOST=%s", host) < 0)
+		err(EX_OSERR, "malloc()");
+	env[1] = NULL;
 
 	if ((hstrec->last_attempt + hstrec->locked_for < time(NULL) || \
 	    force != 0) && hstrec->last_attempt != 0) {
 		hstrec->locked_for = 0;
+		hstrec->num = 0;
 		if (hstent->unlock_cmd != NULL)
-/* XXX: set env */
-			exec_cmd(hstent->unlock_cmd, NULL);
+			exec_cmd(hstent->unlock_cmd, env);
 		return 0;
 	}
 	

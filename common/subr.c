@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.9 2005/08/17 14:21:04 stas Exp $
+ * $Id: subr.c,v 1.10 2005/08/17 16:51:20 stas Exp $
  */
 
 #include <errno.h>
@@ -51,10 +51,6 @@
 
 #include <netinet/in.h>
 
-#include <security/pam_appl.h>
-#include <security/pam_mod_misc.h>
-#include <security/openpam.h>
-
 #include "pam_af.h"
 #include "subr.h"
 
@@ -67,9 +63,12 @@
 
 #ifndef PAM_AF_DEFS
 # define LOGERR(...) warnx(__VA_ARGS__)
-#else
+#else /* !PAM_AF_DEFS */
+# include <security/pam_appl.h>
+# include <security/pam_mod_misc.h>
+# include <security/openpam.h>
 # define LOGERR(...) openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
-#endif
+#endif /* PAM_AF_DEFS */
 
 int my_getnameinfo(addr, addrlen, buf, buflen)
 	void	*addr;
@@ -463,4 +462,4 @@ exec_cmd(str, env)
 	}
 
 	return 0;	
-}	
+}
