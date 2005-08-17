@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.8 2005/08/17 12:41:16 stas Exp $
+ * $Id: pam_af.c,v 1.9 2005/08/17 14:21:04 stas Exp $
  */
 
 #include <errno.h>
@@ -58,9 +58,6 @@
 
 /* Prototypes */
 static char **	pam_af_build_env	__P((pam_handle_t *pamh));
-
-extern const char * cfgdb;
-extern const char * stdb;
 
 #define ENV_ITEM(item) {(item), #item}
 static struct {
@@ -135,6 +132,8 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 {
 	char *host;
 	DBM *stdbp;
+	const char *cfgdb = CFGDB;
+	const char *stdb = STATDB;
 	datum key, data;
 	hostrec_t hstr;
 	hostrule_t *hostent;
@@ -275,6 +274,7 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	hostrec_t hstr;
 	int ret;
 	const char *tmp;
+	const char *stdb = STATDB;
 
 	if ((tmp = openpam_get_option(pamh, "statdb")) != NULL)
 		stdb = tmp;	

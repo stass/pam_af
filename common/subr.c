@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.8 2005/08/17 01:46:36 stas Exp $
+ * $Id: subr.c,v 1.9 2005/08/17 14:21:04 stas Exp $
  */
 
 #include <errno.h>
@@ -57,9 +57,6 @@
 
 #include "pam_af.h"
 #include "subr.h"
-
-const char *stdb = STATDB;
-const char *cfgdb = CFGDB;
 
 #define IPV4_ADDR(sockaddr) \
     ((char *)&(((struct sockaddr_in *)sockaddr)->sin_addr.s_addr))
@@ -223,7 +220,6 @@ my_getaddrinfo(host, family, pmai)
                                 break;
 
                 default:
-				ASSERT(res->ai_addrlen)
 				mai->addr = (char *)malloc(res->ai_addrlen);
 				if (mai->addr == NULL) {
 					my_freeaddrinfo(*pmai);

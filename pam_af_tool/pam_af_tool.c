@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.10 2005/08/17 02:37:46 stas Exp $
+ * $Id: pam_af_tool.c,v 1.11 2005/08/17 14:21:04 stas Exp $
  */
 
 #include <errno.h>
@@ -55,8 +55,8 @@
 #include "pam_af.h"
 #include "subr.h"
 
-extern const char *cfgdb;
-extern const char *stdb;
+const char *cfgdb = CFGDB;
+const char *stdb = STATDB;
 
 static void		usage			__P((void));
 int			main			__P((int argc, char **argv));
@@ -112,7 +112,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage:\n"					\
+	(void)fprintf(stderr, "usage:\n"				\
 	    "\t%1$s ruleadd -h host -a attempts -t time"		\
 	    "\n\t\t[-l cmd] [-u cmd] [-d file] [-v]\n"			\
 	    "\t%1$s rulemod -h host [-a attempts] [-t time]"		\
@@ -153,7 +153,7 @@ main(argc, argv)
 	return 0;
 }	
 
-void cleanup(void)
+static void cleanup(void)
 {
 	if (stdbp)
 		dbm_close(stdbp);
@@ -177,8 +177,6 @@ handle_ruleadd(argc, argv)
 	int flags = 0;
 
 	bzero(&hstent, sizeof(hstent));
-	hstent.attempts = -1;
-	hstent.locktime = -1;
 
 	while ((ch = getopt(argc, argv, "h:a:t:l:u:d:nv")) != -1) {
 		switch (ch) {
@@ -216,13 +214,13 @@ handle_ruleadd(argc, argv)
 
 		case 'l':
 			ASSERT(MAX_CMD_LEN > 0)
-			strncpy(hstent.lock_cmd, optarg, MAX_CMD_LEN);
+			(void)strncpy(hstent.lock_cmd, optarg, MAX_CMD_LEN);
 			hstent.lock_cmd[MAX_CMD_LEN - 1] = 0;
 			break;
 
 		case 'u':
 			ASSERT(MAX_CMD_LEN > 0)
-			strncpy(hstent.unlock_cmd, optarg, MAX_CMD_LEN);
+			(void)strncpy(hstent.unlock_cmd, optarg, MAX_CMD_LEN);
 			hstent.unlock_cmd[MAX_CMD_LEN - 1] = 0;
 			break;
 
@@ -269,6 +267,7 @@ handle_ruleadd(argc, argv)
 		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
 		    host, my_gai_strerror(ret));
 	for (res = res0; res; res = res->next) {
+		ASSERT(res->addr);
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		data.dptr = (char *)&hstent;
@@ -289,7 +288,7 @@ handle_ruleadd(argc, argv)
 			    buf, sizeof(buf)) != 0)
 				errx(EX_OSERR, "can't get numeric address: %s",\
 				    gai_strerror(ret));
-			fprintf(stderr, "Stored rule for %s.\n", buf);
+			(void)fprintf(stderr, "Stored rule for %s.\n", buf);
 		}
 	}
 	my_freeaddrinfo(res0);
@@ -302,13 +301,13 @@ handle_rulemod(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, dbflags = DBM_REPLACE;
+	int ch, ret;
 	char *host = NULL;
 	datum key, data;
 	struct myaddrinfo *res, *res0;
 	hostrule_t *hstent;
-	long attempts = -1, locktime = -1;
-	char *lockcmd = NULL, *unlockcmd = NULL;
+	long attempts, locktime;
+	char *lockcmd, *unlockcmd;
 	char buf[1024];
 	char *tmp;
 	int found = 0;
@@ -370,7 +369,7 @@ handle_rulemod(argc, argv)
 		/* NOTREACHED */
 
 	/* Open rules database */
-	cfgdbp = dbm_open(cfgdb, O_RDWR | O_CREAT | O_EXLOCK, \
+	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open rules database %s",  cfgdb);
@@ -399,6 +398,7 @@ handle_rulemod(argc, argv)
 		    host, my_gai_strerror(ret));
 
 	for (res = res0; res; res = res->next) {
+		ASSERT(res->addr);
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		
@@ -428,21 +428,23 @@ handle_rulemod(argc, argv)
 			hstent->locktime = locktime;
 		if (flags & LFLAG) {
 			ASSERT(MAX_CMD_LEN > 0)
-			strncpy(hstent->lock_cmd, lockcmd, MAX_CMD_LEN);
+			ASSERT(lockcmd)
+			(void)strncpy(hstent->lock_cmd, lockcmd, MAX_CMD_LEN);
 			hstent->lock_cmd[MAX_CMD_LEN - 1] = '\0';
 		}
 		if (flags & UFLAG) {
 			ASSERT(MAX_CMD_LEN > 0)
-			strncpy(hstent->unlock_cmd, unlockcmd, MAX_CMD_LEN);
+			ASSERT(unlockcmd)
+			(void)strncpy(hstent->unlock_cmd, unlockcmd, \
+			    MAX_CMD_LEN);
 			hstent->unlock_cmd[MAX_CMD_LEN - 1] = '\0';
 		}
 
-		if (dbm_store(cfgdbp, key, data, dbflags) == -1)
+		if (dbm_store(cfgdbp, key, data, DBM_REPLACE) == -1)
 			err(EX_OSERR, "can't store record");
 
-//		if (flags & VFLAG)
-//			warnx("modified rule for ip %s", buf);
-/* XXX: fix */
+		if (flags & VFLAG)
+			warnx("modified rule for ip %s", buf);
 		
 		found = 1;
 	}
@@ -526,6 +528,7 @@ handle_ruledel(argc, argv)
 		    host, my_gai_strerror(ret));
 
 	for (res = res0; res; res = res->next) {
+		ASSERT(res->addr)
 		key.dptr = res->addr;
 		key.dsize = res->addrlen;
 		
@@ -553,7 +556,7 @@ handle_ruledel(argc, argv)
 			errx(EX_OSERR, "can't delete record for %s", buf);
 
 		if (flags & VFLAG)
-			fprintf(stderr, "Deleted %s.\n", buf);
+			(void)fprintf(stderr, "Deleted %s.\n", buf);
 		found = 1;
 	}
 
@@ -616,7 +619,8 @@ handle_rulelist(argc, argv)
 			hstent = (hostrule_t *)data.dptr;
 
 		if (hstent->mask != 0)
-			printf("\t<host ip='%s' mask='%d'>\n", buf, hstent->mask);
+			printf("\t<host ip='%s' mask='%d'>\n", buf, \
+			    hstent->mask);
 		else	
 			printf("\t<host ip='%s'>\n", buf);
 
@@ -626,10 +630,11 @@ handle_rulelist(argc, argv)
 		else
 			printf("\t\t<attempts>%s</attempts>\n", UNLIM);
 
-		printf("\t\t<locktime>%lds</locktime>\n", hstent->locktime);
+		printf("\t\t<locktime>%ldS</locktime>\n", hstent->locktime);
 
 		if (hstent->lock_cmd != NULL)
-			printf("\t\t<lockcmd>%s</lockcmd>\n", hstent->lock_cmd);
+			printf("\t\t<lockcmd>%s</lockcmd>\n", \
+			    hstent->lock_cmd);
 
 		if (hstent->unlock_cmd != NULL)
 			printf("\t\t<unlockcmd>%s</unlockcmd>\n", \
@@ -687,7 +692,7 @@ handle_ruleflush(argc, argv)
 	}
 
 	if (flags & VFLAG)
-		fprintf(stderr, "%d records flushed\n",i); 
+		(void)fprintf(stderr, "%d records flushed\n",i); 
 
 	exit(EX_OK);
 }
@@ -738,7 +743,6 @@ handle_statdel(argc, argv)
 
 	atexit(cleanup);
 
-	ASSERT(host)
 	key.dptr = host;
 	key.dsize = strlen(host) + 1;
 	
@@ -748,11 +752,11 @@ handle_statdel(argc, argv)
 		err(EX_OSERR, "can't delete record");
 	case 1:
 		if (flags & VFLAG)
-			fprintf(stderr, "Record not found.\n");
+			(void)fprintf(stderr, "Record not found.\n");
 	}
 	
 	if (flags & VFLAG)
-		fprintf(stderr, "Deleted.\n");
+		(void)fprintf(stderr, "Deleted.\n");
 
 
 	exit(EX_OK);
@@ -768,6 +772,7 @@ handle_statlist(argc, argv)
 	hostrec_t *hstrec;
 	char *tmp;
 	char buf[1024];
+	char *tstr;
 
 	while ((ch = getopt(argc, argv, "d:")) != -1) {
 		switch (ch) {
@@ -801,8 +806,10 @@ handle_statlist(argc, argv)
 
 		printf("\t<host hostname='%s'>\n", (char *)key.dptr);
 		printf("\t\t<attempts>%ld</attempts>\n", hstrec->num);
-		printf("\t\t<last_attempt>%lds</last_attempt>\n", \
-		    hstrec->last_attempt);
+		tstr = ctime((const time_t *)&hstrec->last_attempt);
+		ASSERT(strlen(tstr) > 0)
+		tstr[strlen(tstr) - 1] = 0;
+		printf("\t\t<last_attempt>%s</last_attempt>\n", tstr);
 		printf("\t\t<status>%s</status>\n", hstrec->locked_for == 0 ? \
 		    "unlocked" : "locked");
 		printf("\t</host>\n");
@@ -857,7 +864,7 @@ handle_statflush(argc, argv)
 	}
 
 	if (flags & VFLAG)
-		fprintf(stderr, "%d records flushed\n", i); 
+		(void)fprintf(stderr, "%d records flushed\n", i); 
 
 	exit(EX_OK);
 }
@@ -925,7 +932,6 @@ handle_lock(argc, argv)
 			hstrec = (hostrec_t *)data.dptr;
 		/* XXX: report used ip */
 
-		/* XXX: let find_host_rule opens base */
 		hstent = find_host_rule(cfgdb, host);
 		ASSERT(hstent);
 
@@ -1049,7 +1055,6 @@ handle_unlock(argc, argv)
 			else
 				hstrec = (hostrec_t *)data.dptr;
 
-/* XXX: check key.dsize */
 			hstent = find_host_rule(cfgdb, key.dptr);
 			ASSERT(hstent);
 	
@@ -1076,6 +1081,7 @@ lock_host(hstrec, hstent, force)
 		hstrec->locked_for = hstent->locktime;
 		hstrec->last_attempt = time(NULL);
 		if (hstent->lock_cmd != NULL)
+/* XXX: set env */
 			exec_cmd(hstent->lock_cmd, NULL);
 		return 0;
 	}
@@ -1094,8 +1100,8 @@ unlock_host(hstrec, hstent, force)
 	    force != 0) && hstrec->last_attempt != 0) {
 		hstrec->locked_for = 0;
 		if (hstent->unlock_cmd != NULL)
-			exec_cmd(hstent->unlock_cmd, NULL);
 /* XXX: set env */
+			exec_cmd(hstent->unlock_cmd, NULL);
 		return 0;
 	}
 	
