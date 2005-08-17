@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.6 2005/08/17 00:31:40 stas Exp $
+ * $Id: pam_af.c,v 1.7 2005/08/17 01:29:02 stas Exp $
  */
 
 #include <errno.h>
@@ -53,7 +53,6 @@
 #include <security/pam_mod_misc.h>
 #include <security/openpam.h>
 
-#define PAM_AF_DEFS
 #include "pam_af.h"
 #include "subr.h"
 
@@ -143,7 +142,6 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	int ret, pam_ret = PAM_SUCCESS;
 	int pam_err_ret = PAM_AUTH_ERR;
 	const char *tmp;
-	char	ebuf[1024];
 	char **env;
 
 	int update_when_locked = 0; /* Update host stats when it's locked */
@@ -225,18 +223,14 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	/* Unlock host, if it was not rejected yet */
 	if (hstr.locked_for != 0 && pam_ret != PAM_AUTH_ERR) {
 		PAM_AF_LOG("unlocking host %s due the locktime has been " \
-		    passed", host);
+		    "passed", host);
 		hstr.num = 0;
 		hstr.locked_for = 0;
 		pam_ret = PAM_SUCCESS;
 
 		/* Execute unlocking cmd, if needed */
 		if (strlen(hostent->unlock_cmd) > 0) {
-			ret = exec_cmd(hostent->unlock_cmd, env, ebuf, \
-			    sizeof(ebuf));
-			if (ret != 0)
-				PAM_AF_LOGERR("error executing unlocking" \
-				    " cmd: %s", ebuf);
+			exec_cmd(hostent->unlock_cmd, env);
 		}
 	}
 
@@ -250,11 +244,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		hstr.locked_for = hostent->locktime;
 		pam_ret = PAM_AUTH_ERR;
 		if (strlen(hostent->lock_cmd) > 0) {
-			ret = exec_cmd(hostent->lock_cmd, env, ebuf, \
-			    sizeof(ebuf));
-			if (ret != 0)
-				PAM_AF_LOGERR("error executing locking cmd:" \
-				    " %s", ebuf);
+			exec_cmd(hostent->lock_cmd, env);
 		}
 	}
 

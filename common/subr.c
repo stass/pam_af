@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.6 2005/08/16 23:48:51 stas Exp $
+ * $Id: subr.c,v 1.7 2005/08/17 01:29:02 stas Exp $
  */
 
 #include <errno.h>
@@ -51,6 +51,10 @@
 
 #include <netinet/in.h>
 
+#include <security/pam_appl.h>
+#include <security/pam_mod_misc.h>
+#include <security/openpam.h>
+
 #include "pam_af.h"
 #include "subr.h"
 
@@ -64,6 +68,12 @@ const char *cfgdb = CFGDB;
 #define IPV4SZ sizeof(struct in_addr)
 #define IPV6SZ sizeof(struct in6_addr)
 
+#ifndef PAM_AF_DEFS
+# define LOGERR(...) warnx(__VA_ARGS__)
+#else
+# define LOGERR(...) openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
+#endif
+
 int my_getnameinfo(addr, addrlen, buf, buflen)
 	void	*addr;
 	size_t	addrlen;
@@ -76,8 +86,17 @@ int my_getnameinfo(addr, addrlen, buf, buflen)
 	size_t			salen;
 	int			ret;
 
+	ASSERT(addr);
+	ASSERT(buf);
+
+	if (buflen == 0) {
+		*buf = 0;
+		return 0;
+	}
+
 	if (strncmp(addr, DEFRULE, addrlen) == 0) {
 		snprintf(buf, buflen, "%s", DEFRULE);
+		buf[buflen - 1] = 0;
 		return 0;
 	}
 
@@ -123,7 +142,8 @@ my_freeaddrinfo(mai0)
 
 	for(mai = mai0; mai; mai = mai1) {
 		mai1 = mai->next;
-		free(mai->addr);
+		if (mai->addr != NULL)
+			free(mai->addr);
 		free(mai);
 	}
 }
@@ -145,6 +165,7 @@ my_getaddrinfo(host, family, pmai)
 	myaddrinfo_t *mai, **last;
 	int ret;
 	
+	ASSERT(pmai != NULL);
 	if (strncmp(host, DEFRULE, strlen(DEFRULE)) == 0) {
 		*pmai = (myaddrinfo_t *)malloc(sizeof(myaddrinfo_t));
 		if (*pmai == NULL)
@@ -175,6 +196,7 @@ my_getaddrinfo(host, family, pmai)
 		}
 		mai->next = NULL;
 
+		ASSERT(res->ai_family)
                 switch (res->ai_family) {
                 case PF_INET:
 				mai->addr = (char *)malloc(IPV4SZ);
@@ -182,6 +204,7 @@ my_getaddrinfo(host, family, pmai)
 					my_freeaddrinfo(*pmai);
 					return EAI_MEMORY;
 				}
+				ASSERT(res->ai_addr)
                                 bcopy(IPV4_ADDR(res->ai_addr), mai->addr, \
 				    IPV4SZ);
                                 mai->addrlen = IPV4SZ;
@@ -193,17 +216,20 @@ my_getaddrinfo(host, family, pmai)
 					my_freeaddrinfo(*pmai);
 					return EAI_MEMORY;
 				}
+				ASSERT(res->ai_addr)
                                 bcopy(IPV6_ADDR(res->ai_addr), mai->addr, \
 				    IPV6SZ);
                                 mai->addrlen = IPV6SZ;
                                 break;
 
                 default:
+				ASSERT(res->ai_addrlen)
 				mai->addr = (char *)malloc(res->ai_addrlen);
 				if (mai->addr == NULL) {
 					my_freeaddrinfo(*pmai);
 					return EAI_MEMORY;
 				}
+				ASSERT(res->ai_addr)
                                 bcopy(res->ai_addr, mai->addr, \
 				    res->ai_addrlen);
                                 mai->addrlen = res->ai_addrlen;
@@ -225,39 +251,48 @@ find_host_rule(db, host)
 	datum			key, data;
 	struct			myaddrinfo *res0, *res;
 	static hostrule_t	hstent;
-	char			buf[1024];
 	int			found = 0;
 	int			mask;
 	int			ret;
-	char			defrule[] = DEFRULE;
 	DBM			*dbp;
 
-	bzero(&key, sizeof(key));
-	bzero(&data, sizeof(data));
+	ASSERT(host)
+	ASSERT(db)
 
         /* Open cfg database */
         dbp = dbm_open(db, O_RDONLY | O_CREAT, \
             CFGDB_PERM);
-        if (dbp == NULL)
+        if (dbp == NULL) {
+		LOGERR("can't open database %s, using default values: %s", \
+		    db, strerror(errno)); 
 		goto nodb;
+	}
 
-	if ((ret = my_getaddrinfo(host, PF_UNSPEC, &res0)) != 0)
-		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
+	if ((ret = my_getaddrinfo(host, PF_UNSPEC, &res0)) != 0) {
+		LOGERR("can't resolve hostname %s, using default values: %s", \
 		    host, my_gai_strerror(ret));
+		goto nodb;
+	}
 
 	for (res = res0; res && !found; res = res->next) {
-		ret = my_getnameinfo(res->addr, res->addrlen, buf, sizeof(buf));
-		if (ret != 0)
-			err(EX_OSERR, "can't get numeric address");
 
 		for (key = dbm_firstkey(dbp); key.dptr; key = dbm_nextkey(dbp))
 		{
+			ASSERT(res->addr)
+			ASSERT(res->addrlen);
 			if ((unsigned)key.dsize != res->addrlen)
 				continue;
 
 			data = dbm_fetch(dbp, key);
-			if (data.dsize != sizeof(hstent))
-				errx(EX_DATAERR, "database seriously broken");
+			if (data.dptr == NULL) {
+				LOGERR("can't fetch record");
+				goto nodb;
+			}
+			if (data.dsize != sizeof(hstent)) {
+				LOGERR("database %s seriously broken", db);
+				goto nodb;
+			}
+			
 			mask = ((hostrule_t *)data.dptr)->mask;
 			if (mask == 0)
 				mask = res->addrlen * 8;
@@ -269,27 +304,35 @@ find_host_rule(db, host)
 		}
 	}
 	if (found == 0) {
-		key.dptr = defrule;
+		key.dptr = strdup(DEFRULE);
+		if (key.dptr == NULL) {
+			LOGERR("malloc: %s", strerror(errno));
+			goto nodb;
+		}
 		key.dsize = strlen(DEFRULE) + 1;
 		data = dbm_fetch(dbp, key);
+		free(key.dptr);
+	}
+
+	if (data.dptr != NULL) {
+		if (data.dsize != sizeof(hstent)) {
+			LOGERR("database %s seriously broken", db);
+			goto nodb;
+		}
+			
+		bcopy(data.dptr, &hstent, sizeof(hstent));
+
+		dbm_close(dbp);
+		return &hstent;
 	}
 
 nodb:
-	if (data.dptr != NULL) {
-		if (data.dsize != sizeof(hstent))
-			errx(EX_DATAERR, "database seriously broken");
-			
-		bcopy(data.dptr, &hstent, sizeof(hstent));
-	}
-	else {
-		hstent.mask = 0;
-		hstent.attempts = DEFAULT_ATTEMPTS;
-		hstent.locktime = DEFAULT_LOCKTIME;
-		*hstent.lock_cmd = 0;
-		*hstent.unlock_cmd = 0;
-	}
+	hstent.mask = 0;
+	hstent.attempts = DEFAULT_ATTEMPTS;
+	hstent.locktime = DEFAULT_LOCKTIME;
+	*hstent.lock_cmd = 0;
+	*hstent.unlock_cmd = 0;
 
-	dbm_close(dbp);
 	return &hstent;
 }
 
@@ -299,19 +342,13 @@ lock_host(hstrec, hstent, fflag)
 	hostrule_t	*hstent;
 	int		fflag;
 {
-	int ret;
-	char ebuf[1024];
 
 	if ((hstrec->num >= hstent->attempts && hstent->attempts != 0) || \
 	    fflag != 0) {
 		hstrec->locked_for = hstent->locktime;
 		hstrec->last_attempt = time(NULL);
-		if (hstent->lock_cmd != NULL) {
-			ret = exec_cmd(hstent->lock_cmd, NULL, ebuf, \
-			    sizeof(ebuf));
-			if (ret != 0)
-				warnx("error executing lock cmd: %s", ebuf);
-		}
+		if (hstent->lock_cmd != NULL)
+			exec_cmd(hstent->lock_cmd, NULL);
 		return 0;
 	}
 	
@@ -324,18 +361,13 @@ unlock_host(hstrec, hstent, fflag)
 	hostrule_t	*hstent;
 	int		fflag;
 {
-	int ret;
-	char ebuf[1024];
 
 	if ((hstrec->last_attempt + hstrec->locked_for < time(NULL) || \
 	    fflag != 0) && hstrec->last_attempt != 0) {
 		hstrec->locked_for = 0;
-		if (hstent->unlock_cmd != NULL) {
-			ret = exec_cmd(hstent->unlock_cmd, NULL, ebuf, \
-			    sizeof(ebuf));
-			if (ret != 0)
-				warnx("error executing unlock cmd: %s", ebuf);
-		}
+		if (hstent->unlock_cmd != NULL)
+			exec_cmd(hstent->unlock_cmd, NULL);
+/* XXX: set env */
 		return 0;
 	}
 	
@@ -352,6 +384,9 @@ addr_cmp(addr1, addr2, addrlen, mask)
 	register int bytes = mask / 8;
 	register int left = mask % 8;
 	register int8_t byte1 = 0, byte2 = 0;
+
+	ASSERT(addr1)
+	ASSERT(addr2)
 
 	if (mask > (signed)addrlen * 8)
 		return 1;
@@ -421,11 +456,9 @@ parse_time(str, ptime)
  * Execute external cmd, return error message in ebuf, if not NULL. 
  */
 int
-exec_cmd(str, env, ebuf, ebufsz)
+exec_cmd(str, env)
 	const char	*str;
 	char * const env[];
-	char		*ebuf;
-	size_t		ebufsz;
 {
 	int pid, ret = 0, status;
 			
@@ -437,11 +470,7 @@ exec_cmd(str, env, ebuf, ebufsz)
 		_exit(1);
 		break;
 	case -1:
-		if (ebuf != NULL) {
-			snprintf(ebuf, ebufsz, "can't fork: %s", \
-			    strerror(errno));
-			ebuf[ebufsz - 1] = 0;
-		}
+		LOGERR("can't fork: %s", strerror(errno));
 		return 1;
 		break;
 	default:
@@ -449,47 +478,28 @@ exec_cmd(str, env, ebuf, ebufsz)
 	}
 
 	if (waitpid(pid, &status, 0) == -1) {
-		if (ebuf != NULL) {
-			snprintf(ebuf, ebufsz, "waitpid(): %s", \
-			    strerror(errno));
-			ebuf[ebufsz - 1] = 0;
-		}
-		return 1;
+		LOGERR("waitpid(): %s", strerror(errno));
+		return 2;
 	}
 	
 	/* Check child exit value */
 	if (ret != 0) {
-		if (ebuf != NULL) {
-			snprintf(ebuf, ebufsz, "execle(): %s", \
-			    strerror(errno));
-			ebuf[ebufsz - 1] = 0;
-		}
-		return 1;
+		LOGERR("execle(): %s", strerror(errno));
+		return 3;
 	}
 
 	if (WIFSIGNALED(status)) {
-		if (ebuf != NULL) {
-			snprintf(ebuf, ebufsz, "cmd caught signal %d%s", \
-			    WTERMSIG(status),
-		    	    WCOREDUMP(status) ? " (core dumped)" : "");
-			ebuf[ebufsz - 1] = 0;
-		}
-		return 1;
+		LOGERR("cmd caught signal %d%s", WTERMSIG(status), \
+		    WCOREDUMP(status) ? " (core dumped)" : "");
+		return 4;
 	}
 	if (WIFEXITED(status) == 0) {
-		if (ebuf != NULL) {
-			snprintf(ebuf, ebufsz, "unknown status 0x%x", status);
-			ebuf[ebufsz - 1] = 0;
-		}
-		return 1;
+		LOGERR("unknown status 0x%x", status);
+		return 5;
 	}
 	if (WEXITSTATUS(status) != 0) {
-		if (ebuf != NULL) {
-			snprintf(ebuf, ebufsz, "cmd returned code %d", \
-			    WEXITSTATUS(status));
-			ebuf[ebufsz - 1] = 0;
-		}
-		return 1;
+		LOGERR("cmd returned code %d", WEXITSTATUS(status));
+		return 6;
 	}
 
 	return 0;	

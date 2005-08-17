@@ -1,5 +1,5 @@
-# $Id: Makefile,v 1.2 2005/08/15 02:33:26 stas Exp $
-CFLAGS+=	-I${.CURDIR}/common -I${.CURDIR}
+# $Id: Makefile,v 1.3 2005/08/17 01:29:02 stas Exp $
+CFLAGS+=	-I${.CURDIR}/common -I${.CURDIR} -DPAM_AF_DEFS
 LIB=		pam_af
 SRCS=		pam_af.c subr.c
 NO_MAN=		1
