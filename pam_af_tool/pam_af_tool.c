@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.16 2005/08/18 13:02:27 stas Exp $
+ * $Id: pam_af_tool.c,v 1.17 2005/08/18 15:17:08 stas Exp $
  */
 
 #include <errno.h>
@@ -326,9 +326,9 @@ handle_rulemod(argc, argv)
 	char	*argv[];
 {
 	char			*host = NULL;
-	datum			key, data;
+	datum			keym data;
 	struct myaddrinfo	*res, *res0;
-	hostrule_t		*hstent;
+	hostrule_t		hstent;
 	long			attempts = 0, locktime = 0;
 	char			*lockcmd = NULL;
 	char			*unlockcmd = NULL;
@@ -442,33 +442,35 @@ handle_rulemod(argc, argv)
 			}
 			continue;
 		}
-		else if (data.dsize != sizeof(*hstent))
+		else if (data.dsize != sizeof(hstent))
 			errx(EX_DATAERR, "database '%s' seriously broken", \
 			    cfgdb);
 		else 
-			hstent = (hostrule_t *)data.dptr;
+			bcopy(data.dptr, &hstent, sizeof(hstent));
 
-		if (hstent->mask != mask)
+		if (hstent.mask != mask)
 			continue;
 
 		if (flags & AFLAG)
-			hstent->attempts = attempts;
+			hstent.attempts = attempts;
 		if (flags & TFLAG)
-			hstent->locktime = locktime;
+			hstent.locktime = locktime;
 		if (flags & LFLAG) {
 			ASSERT(MAX_CMD_LEN > 0)
 			ASSERT(lockcmd)
-			(void)strncpy(hstent->lock_cmd, lockcmd, MAX_CMD_LEN);
-			hstent->lock_cmd[MAX_CMD_LEN - 1] = '\0';
+			(void)strncpy(hstent.lock_cmd, lockcmd, MAX_CMD_LEN);
+			hstent.lock_cmd[MAX_CMD_LEN - 1] = '\0';
 		}
 		if (flags & UFLAG) {
 			ASSERT(MAX_CMD_LEN > 0)
 			ASSERT(unlockcmd)
-			(void)strncpy(hstent->unlock_cmd, unlockcmd, \
+			(void)strncpy(hstent.unlock_cmd, unlockcmd, \
 			    MAX_CMD_LEN);
-			hstent->unlock_cmd[MAX_CMD_LEN - 1] = '\0';
+			hstent.unlock_cmd[MAX_CMD_LEN - 1] = '\0';
 		}
 
+		data.dptr = (char *)&hstent;
+		data.dsize = sizeof(hstent);
 		if (dbm_store(cfgdbp, key, data, DBM_REPLACE) == -1)
 			err(EX_OSERR, "can't store record");
 

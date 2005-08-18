@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.h,v 1.3 2005/08/16 23:48:51 stas Exp $
+ * $Id: pam_af.h,v 1.4 2005/08/18 15:17:08 stas Exp $
  */
 #ifndef _PAM_AF_H_
 #define _PAM_AF_H_
@@ -33,7 +33,7 @@
 #define STATDB "/var/db/pam_af"
 #define STATDB_PERM (S_IRUSR | S_IWUSR)
 
-#define MAX_CMD_LEN 255
+#define MAX_CMD_LEN 25
 #define CFGDB "/etc/pam_af.conf"
 #define CFGDB_PERM (S_IRUSR | S_IWUSR)
 
