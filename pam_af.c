@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.10 2005/08/18 00:31:05 stas Exp $
+ * $Id: pam_af.c,v 1.11 2005/08/18 01:31:39 stas Exp $
  */
 
 #include <errno.h>
@@ -156,16 +156,16 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	/* Get hostname */
 	ret = pam_get_item(pamh, PAM_RHOST, (const void **)&host);
 	if (ret != PAM_SUCCESS) {
-		PAM_AF_LOGERR("can't get %s item", "PAM_RHOST");
+		PAM_AF_LOGERR("can't get '%s' item", "PAM_RHOST");
 		PAM_RETURN(pam_err_ret);
 	}
 
-	PAM_AF_LOG("processing host %s", host);
+	PAM_AF_LOG("processing host '%s'", host);
 
 	/* Open statistics database and obtain exclusive lock */
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
 	if (stdbp == NULL) {
-		PAM_AF_LOGERR("can't open database %s: %s", \
+		PAM_AF_LOGERR("can't open '%s' database: %s", \
 		    stdb, strerror(errno));
 		PAM_RETURN(pam_err_ret);
 	}
@@ -184,7 +184,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	else {
 		PAM_AF_LOG("found host record in statistics database");
 		if (data.dsize != sizeof(hstr)) {
-			PAM_AF_LOGERR("database %s seriously broken", stdb);
+			PAM_AF_LOGERR("database '%s' seriously broken", stdb);
 			PAM_RETURN(pam_err_ret);	
 		}
 		bcopy(data.dptr, &hstr, sizeof(hstr));
@@ -193,7 +193,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	/* Reject host, if locktime interval wasn't passed */
 	if (hstr.locked_for != 0 && \
 	    (curtime - hstr.last_attempt) <= hstr.locked_for) {
-		PAM_AF_LOG("rejecting host %s, its blocked for %ld since" \
+		PAM_AF_LOG("rejecting host '%s', its blocked for %ld since" \
 		    " %ld", host, hstr.locked_for, hstr.last_attempt);
 
 		pam_ret = PAM_AUTH_ERR;
@@ -219,7 +219,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	/* Unlock host, if it was not rejected yet */
 	if (hstr.locked_for != 0 && pam_ret != PAM_AUTH_ERR) {
-		PAM_AF_LOG("unlocking host %s due the locktime has been " \
+		PAM_AF_LOG("unlocking host '%s' due the locktime has been " \
 		    "passed", host);
 		hstr.num = 0;
 		hstr.locked_for = 0;
@@ -227,7 +227,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 		/* Execute unlocking cmd, if needed */
 		if (strlen(hostent->unlock_cmd) > 0) {
-			exec_cmd(hostent->unlock_cmd, env);
+			(void)exec_cmd(hostent->unlock_cmd, env);
 		}
 	}
 
@@ -237,11 +237,11 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	/* Lock host, if needed */
 	if (hstr.num > hostent->attempts && hostent->attempts != 0) {
-		PAM_AF_LOG("blocking host %s", host);
+		PAM_AF_LOG("blocking host '%s'", host);
 		hstr.locked_for = hostent->locktime;
 		pam_ret = PAM_AUTH_ERR;
 		if (strlen(hostent->lock_cmd) > 0) {
-			exec_cmd(hostent->lock_cmd, env);
+			(void)exec_cmd(hostent->lock_cmd, env);
 		}
 	}
 
@@ -280,14 +280,14 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	/* Get peer host */
 	ret = pam_get_item(pamh, PAM_RHOST, (const void **)&host);
 	if (ret != PAM_SUCCESS) {
-		PAM_AF_LOGERR("can't get %s item", "PAM_RHOST");
+		PAM_AF_LOGERR("can't get '%s' item", "PAM_RHOST");
 		PAM_RETURN(PAM_SERVICE_ERR);
 	}
 
 	/* Open statistics database */
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
 	if (stdbp == NULL) {
-		PAM_AF_LOGERR("can't open database %s: %s", \
+		PAM_AF_LOGERR("can't open '%s' database: %s", \
 		    stdb, strerror(errno));
 		PAM_RETURN(PAM_CRED_UNAVAIL);
 	}

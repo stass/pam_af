@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.14 2005/08/18 00:31:05 stas Exp $
+ * $Id: pam_af_tool.c,v 1.15 2005/08/18 01:31:39 stas Exp $
  */
 
 #include <errno.h>
@@ -238,7 +238,7 @@ handle_ruleadd(argc, argv)
 		}
 	}
 
-	if (!(flags & HFLAG & AFLAG & TFLAG))
+	if (!(flags & (HFLAG | AFLAG | TFLAG)))
 		usage();
 		/* NOTREACHED */
 
@@ -248,7 +248,7 @@ handle_ruleadd(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_CREAT | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  cfgdb);
+		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
 	atexit(cleanup);
 
@@ -270,7 +270,7 @@ handle_ruleadd(argc, argv)
 		family = PF_UNSPEC;
 
 	if ((ret = my_getaddrinfo(host, family, &res0)) != 0)
-		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
+		errx(EX_DATAERR, "can't resolve hostname '%s': %s", \
 		    host, my_gai_strerror(ret));
 
 	for (res = res0; res; res = res->next) {
@@ -378,7 +378,7 @@ handle_rulemod(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  cfgdb);
+		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
 	atexit(cleanup);
 
@@ -400,7 +400,7 @@ handle_rulemod(argc, argv)
 		family = PF_UNSPEC;
 
 	if ((ret = my_getaddrinfo(host, family, &res0)) != 0)
-		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
+		errx(EX_DATAERR, "can't resolve hostname '%s': %s", \
 		    host, my_gai_strerror(ret));
 
 	for (res = res0; res; res = res->next) {
@@ -416,12 +416,12 @@ handle_rulemod(argc, argv)
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
 			if (flags & VFLAG) {
-				warnx("record for address %s not found", buf);
+				warnx("record for address '%s' not found", buf);
 			}
 			continue;
 		}
 		else if (data.dsize != sizeof(*hstent))
-			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
 
@@ -506,7 +506,7 @@ handle_ruledel(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  cfgdb);
+		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
 	atexit(cleanup);
 
@@ -528,7 +528,7 @@ handle_ruledel(argc, argv)
 		family = PF_UNSPEC;
 
 	if ((ret = my_getaddrinfo(host, family, &res0)) != 0)
-		errx(EX_DATAERR, "can't resolve hostname %s: %s", \
+		errx(EX_DATAERR, "can't resolve hostname '%s': %s", \
 		    host, my_gai_strerror(ret));
 
 	for (res = res0; res; res = res->next) {
@@ -544,12 +544,12 @@ handle_ruledel(argc, argv)
 		data = dbm_fetch(cfgdbp, key);
 		if (data.dptr == NULL) {
 			if (flags & VFLAG) {
-				warnx("record for address %s not found", buf);
+				warnx("record for address '%s' not found", buf);
 			}
 			continue;
 		}
 		else if (data.dsize != sizeof(*hstent))
-			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
 
@@ -557,10 +557,10 @@ handle_ruledel(argc, argv)
 			continue;
 
 		if (dbm_delete(cfgdbp, key) != 0)
-			errx(EX_OSERR, "can't delete record for %s", buf);
+			errx(EX_OSERR, "can't delete record for '%s'", buf);
 
 		if (flags & VFLAG)
-			(void)fprintf(stderr, "Deleted rule for %s.\n", buf);
+			(void)fprintf(stderr, "Deleted rule for '%s'.\n", buf);
 		found = 1;
 	}
 
@@ -599,7 +599,7 @@ handle_rulelist(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDONLY, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  cfgdb);
+		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
 	atexit(cleanup);
 
@@ -616,7 +616,7 @@ handle_rulelist(argc, argv)
 			err(EX_OSERR, "can't fetch data");
 		}
 		else if (data.dsize != sizeof(*hstent))
-			errx(EX_DATAERR, "database %s seriously broken", cfgdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
 
@@ -680,7 +680,7 @@ handle_ruleflush(argc, argv)
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
 	if (cfgdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  cfgdb);
+		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
 	atexit(cleanup);
 
@@ -737,7 +737,7 @@ handle_statdel(argc, argv)
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  stdb);
+		err(EX_IOERR, "can't open '%s' database",  stdb);
 
 	atexit(cleanup);
 
@@ -785,7 +785,7 @@ handle_statlist(argc, argv)
 	stdbp = dbm_open(stdb, O_RDONLY, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  stdb);
+		err(EX_IOERR, "can't open '%s' database",  stdb);
 
 	atexit(cleanup);
 
@@ -793,9 +793,9 @@ handle_statlist(argc, argv)
 	for (key = dbm_firstkey(stdbp); key.dptr; key = dbm_nextkey(stdbp)) {
 		data = dbm_fetch(stdbp, key);
 		if (data.dptr == NULL)
-			err(EX_OSERR, "can't fetch data from %s", stdb);
+			err(EX_OSERR, "can't fetch data");
 		else if (data.dsize != sizeof(*hstrec))
-			errx(EX_DATAERR, "database %s seriously broken", stdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", stdb);
 		else
 			hstrec = (hostrec_t *)data.dptr;
 
@@ -845,7 +845,7 @@ handle_statflush(argc, argv)
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  stdb);
+		err(EX_IOERR, "can't open '%s' database",  stdb);
 
 	atexit(cleanup);
 
@@ -908,7 +908,7 @@ handle_lock(argc, argv)
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  stdb);
+		err(EX_IOERR, "can't open '%s' database",  stdb);
 
 	atexit(cleanup);
 
@@ -917,9 +917,9 @@ handle_lock(argc, argv)
 		key.dsize = strlen(host) + 1;
 		data = dbm_fetch(stdbp, key);
 		if (data.dptr == NULL)
-			err(EX_OSERR, "can't fetch data from %s", stdb);
+			err(EX_OSERR, "can't fetch data");
 		else if (data.dsize != sizeof(hstrec))
-			errx(EX_DATAERR, "database %s seriously broken", stdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", stdb);
 		else
 			bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
@@ -940,9 +940,9 @@ handle_lock(argc, argv)
 		    key = dbm_nextkey(stdbp)) {
 			data = dbm_fetch(stdbp, key);
 			if (data.dptr == NULL)
-				err(EX_OSERR, "can't fetch data from %s", stdb);
+				err(EX_OSERR, "can't fetch data");
 			else if (data.dsize != sizeof(hstrec))
-				errx(EX_DATAERR, "database %s seriously " \
+				errx(EX_DATAERR, "database '%s' seriously " \
 				    "broken", stdb);
 			else
 				bcopy(data.dptr, &hstrec, sizeof(hstrec));
@@ -1011,7 +1011,7 @@ handle_unlock(argc, argv)
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
 	if (stdbp == NULL)
-		err(EX_IOERR, "can't open database %s",  stdb);
+		err(EX_IOERR, "can't open '%s' database",  stdb);
 
 	atexit(cleanup);
 
@@ -1020,9 +1020,9 @@ handle_unlock(argc, argv)
 		key.dsize = strlen(host) + 1;
 		data = dbm_fetch(stdbp, key);
 		if (data.dptr == NULL)
-			err(EX_OSERR, "can't fetch data from %s", stdb);
+			err(EX_OSERR, "can't fetch data");
 		else if (data.dsize != sizeof(hstrec))
-			errx(EX_DATAERR, "database %s seriously broken", stdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", stdb);
 		else
 			bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
@@ -1043,9 +1043,9 @@ handle_unlock(argc, argv)
 		    key = dbm_nextkey(stdbp)) {
 			data = dbm_fetch(stdbp, key);
 			if (data.dptr == NULL)
-				err(EX_OSERR, "can't fetch data from %s", stdb);
+				err(EX_OSERR, "can't fetch data");
 			else if (data.dsize != sizeof(hstrec))
-				errx(EX_DATAERR, "database %s seriously " \
+				errx(EX_DATAERR, "database '%s' seriously " \
 				    "broken", stdb);
 			else
 				bcopy(data.dptr, &hstrec, sizeof(hstrec));
@@ -1087,7 +1087,7 @@ lock_host(host, hstrec, hstent, force)
 		hstrec->locked_for = hstent->locktime;
 		hstrec->last_attempt = time(NULL);
 		if (hstent->lock_cmd != NULL)
-			exec_cmd(hstent->lock_cmd, env);
+			(void)exec_cmd(hstent->lock_cmd, env);
 		return 0;
 	}
 	
@@ -1112,7 +1112,7 @@ unlock_host(host, hstrec, hstent, force)
 		hstrec->locked_for = 0;
 		hstrec->num = 0;
 		if (hstent->unlock_cmd != NULL)
-			exec_cmd(hstent->unlock_cmd, env);
+			(void)exec_cmd(hstent->unlock_cmd, env);
 		return 0;
 	}
 	

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.11 2005/08/18 00:31:05 stas Exp $
+ * $Id: subr.c,v 1.12 2005/08/18 01:31:39 stas Exp $
  */
 
 #include <errno.h>
@@ -258,13 +258,13 @@ find_host_rule(db, host)
         dbp = dbm_open(db, O_RDONLY | O_CREAT, \
             CFGDB_PERM);
         if (dbp == NULL) {
-		LOGERR("can't open database %s, using default values: %s", \
+		LOGERR("can't open '%s' database, using default values: %s", \
 		    db, strerror(errno)); 
 		goto nodb;
 	}
 
 	if ((ret = my_getaddrinfo(host, PF_UNSPEC, &res0)) != 0) {
-		LOGERR("can't resolve hostname %s, using default values: %s", \
+		LOGERR("can't resolve hostname '%s', using default values: %s",\
 		    host, my_gai_strerror(ret));
 		goto nodb;
 	}
@@ -284,7 +284,7 @@ find_host_rule(db, host)
 				goto nodb;
 			}
 			if (data.dsize != sizeof(hstent)) {
-				LOGERR("database %s seriously broken", db);
+				LOGERR("database '%s' seriously broken", db);
 				goto nodb;
 			}
 			
@@ -311,7 +311,7 @@ find_host_rule(db, host)
 
 	if (data.dptr != NULL) {
 		if (data.dsize != sizeof(hstent)) {
-			LOGERR("database %s seriously broken", db);
+			LOGERR("database '%s' seriously broken", db);
 			goto nodb;
 		}
 			
