@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.10 2005/08/17 16:51:20 stas Exp $
+ * $Id: subr.c,v 1.11 2005/08/18 00:31:05 stas Exp $
  */
 
 #include <errno.h>
@@ -134,7 +134,7 @@ void
 my_freeaddrinfo(mai0)
 	myaddrinfo_t	*mai0;
 {
-	myaddrinfo_t *mai, *mai1;
+	myaddrinfo_t	*mai, *mai1;
 
 	for(mai = mai0; mai; mai = mai1) {
 		mai1 = mai->next;
@@ -157,9 +157,9 @@ my_getaddrinfo(host, family, pmai)
 	int	family;
 	myaddrinfo_t	**pmai;
 {
-	struct addrinfo hints, *res, *res0;
-	myaddrinfo_t *mai, **last;
-	int ret;
+	struct addrinfo	hints, *res, *res0;
+	myaddrinfo_t	*mai, **last;
+	int		ret;
 	
 	ASSERT(pmai)
 	if (strncmp(host, DEFRULE, strlen(DEFRULE)) == 0) {
@@ -371,9 +371,9 @@ parse_time(str, ptime)
 	const char	*str;
 	long		*ptime;
 {
-	register long rettime = 0;
-	register int i;
-	char *p;
+	register long	rettime = 0;
+	register int	i;
+	char		*p;
 	
 	ASSERT(str)
 	ASSERT(ptime)
@@ -417,7 +417,8 @@ exec_cmd(str, env)
 	const char	*str;
 	char * const env[];
 {
-	int pid, ret = 0, status;
+	int	pid, ret = 0;
+	int	status;
 			
 	ASSERT(str)
 

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.9 2005/08/17 14:21:04 stas Exp $
+ * $Id: pam_af.c,v 1.10 2005/08/18 00:31:05 stas Exp $
  */
 
 #include <errno.h>
@@ -82,12 +82,11 @@ static char **
 pam_af_build_env(pamh)
 	pam_handle_t	*pamh;
 {
-	int ret;
-	int items;
-	register unsigned int i;
-	char **env, **tmp;
-	char *item;
-	char *envstr;
+	int		ret;
+	int		items;
+	unsigned int	i;
+	char		**env, **tmp;
+	char		*item, *envstr;
 			
 	ASSERT(pamh)
 	env = pam_getenvlist(pamh);
@@ -130,18 +129,17 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	int		argc __unused;
 	const char	*argv[] __unused;
 {
-	char *host;
-	DBM *stdbp;
-	const char *cfgdb = CFGDB;
-	const char *stdb = STATDB;
-	datum key, data;
-	hostrec_t hstr;
-	hostrule_t *hostent;
-	register time_t curtime;
-	int ret, pam_ret = PAM_SUCCESS;
-	int pam_err_ret = PAM_AUTH_ERR;
-	const char *tmp;
-	char **env;
+	char		*host;
+	DBM		*stdbp;
+	const char	*cfgdb = CFGDB, *stdb = STATDB;
+	datum		key, data;
+	hostrec_t	hstr;
+	hostrule_t	*hostent;
+	time_t		curtime;
+	int		ret, pam_ret = PAM_SUCCESS;
+	int		 pam_err_ret = PAM_AUTH_ERR;/* Result in case of err. */
+	const char	*tmp;
+	char		**env;
 
 	int update_when_locked = 0; /* Update host stats when it's locked */
 
@@ -268,13 +266,13 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	int		argc __unused;
 	const char	*argv[] __unused;
 {
-	char *host;
-	DBM *stdbp;
-	datum key, data;
-	hostrec_t hstr;
-	int ret;
-	const char *tmp;
-	const char *stdb = STATDB;
+	char		*host;
+	const char	*stdb = STATDB;
+	DBM		*stdbp;
+	datum		key, data;
+	hostrec_t	hstr;
+	const char	*tmp;
+	int		ret;
 
 	if ((tmp = openpam_get_option(pamh, "statdb")) != NULL)
 		stdb = tmp;	

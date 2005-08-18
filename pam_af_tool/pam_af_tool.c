@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.13 2005/08/17 16:51:20 stas Exp $
+ * $Id: pam_af_tool.c,v 1.14 2005/08/18 00:31:05 stas Exp $
  */
 
 #include <errno.h>
@@ -118,15 +118,15 @@ usage(void)
 
 	(void)fprintf(stderr, "usage:\n"				\
 	    "\t%s ruleadd -h host -a attempts -t time"		\
-	    "\n\t\t[-l cmd] [-u cmd] [-d file] [-v]\n"			\
+	    "\n\t\t[-l cmd] [-u cmd] [-r file] [-v]\n"			\
 	    "\t%s rulemod -h host [-a attempts] [-t time]"		\
-	    "\n\t\t[-l cmd] [-u cmd] [-d file] [-v]\n"			\
-	    "\t%s ruledel -h host [-d file] [-v]\n"			\
-	    "\t%s rulelist [-d file]\n"				\
-	    "\t%s ruleflush [-d file] [-v]\n"				\
-	    "\t%s statdel -h host [-d file] [-v]\n"			\
-	    "\t%s statlist [-d file]\n"				\
-	    "\t%s statflush [-d file] [-v]\n"				\
+	    "\n\t\t[-l cmd] [-u cmd] [-r file] [-v]\n"			\
+	    "\t%s ruledel -h host [-r file] [-v]\n"			\
+	    "\t%s rulelist [-r file]\n"				\
+	    "\t%s ruleflush [-r file] [-v]\n"				\
+	    "\t%s statdel -h host [-s file] [-v]\n"			\
+	    "\t%s statlist [-s file]\n"				\
+	    "\t%s statflush [-s file] [-v]\n"				\
 	    "\t%s lock [-h host] [-s file] [-r file] [-fv]\n"		\
 	    "\t%s unlock [-h host] [-s file] [-r file] [-fv]\n", 	\
 	    prog, prog, prog, prog, prog, prog, prog, prog, prog, prog);
@@ -169,28 +169,20 @@ handle_ruleadd(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, dbflags;
-	char *host = NULL;
-	datum key, data;
-	struct myaddrinfo *res, *res0;
-	hostrule_t hstent;
-	char *tmp;
-	char buf[1024];
-	int family;
-	int flags = 0;
+	char			*host = NULL;
+	int			family;
+	hostrule_t		hstent;
+	datum			key, data;
+	struct myaddrinfo	*res, *res0;
+	char			buf[1024], *tmp;
+	char			ch;
+	int			flags = 0, dbflags;
+	int			ret;
 
 	bzero(&hstent, sizeof(hstent));
 
-	while ((ch = getopt(argc, argv, "h:a:t:l:u:d:nv")) != -1) {
+	while ((ch = getopt(argc, argv, "a:h:l:nr:t:u:v")) != -1) {
 		switch (ch) {
-		case 'n':
-			dbflags = DBM_INSERT;
-			flags |= NFLAG;
-			break;
-		case 'v':
-			flags |= VFLAG;
-			break;
-
 		case 'a':
 			flags |= AFLAG;
 			if (strncmp(optarg, UNLIM, strlen(UNLIM)) == 0) {
@@ -201,13 +193,6 @@ handle_ruleadd(argc, argv)
 			if (hstent.attempts <= 0)
 				errx(EX_DATAERR, "invalid attempts: %s",
 				    optarg);
-			break;
-
-		case 't':
-			flags |= TFLAG;
-			if(parse_time(optarg, &hstent.locktime) != 0 || \
-			    hstent.locktime < 0)
-				errx(EX_DATAERR, "invalid time: %s", optarg);
 			break;
 
 		case 'h':
@@ -221,14 +206,30 @@ handle_ruleadd(argc, argv)
 			hstent.lock_cmd[MAX_CMD_LEN - 1] = 0;
 			break;
 
+		case 'n':
+			dbflags = DBM_INSERT;
+			flags |= NFLAG;
+			break;
+
+		case 'r':
+			cfgdb = optarg;
+			break;
+
+		case 't':
+			flags |= TFLAG;
+			if(parse_time(optarg, &hstent.locktime) != 0 || \
+			    hstent.locktime < 0)
+				errx(EX_DATAERR, "invalid time: %s", optarg);
+			break;
+
 		case 'u':
 			ASSERT(MAX_CMD_LEN > 0)
 			(void)strncpy(hstent.unlock_cmd, optarg, MAX_CMD_LEN);
 			hstent.unlock_cmd[MAX_CMD_LEN - 1] = 0;
 			break;
 
-		case 'd':
-			cfgdb = optarg;
+		case 'v':
+			flags |= VFLAG;
 			break;
 
 		default:
@@ -307,26 +308,21 @@ handle_rulemod(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret;
-	char *host = NULL;
-	datum key, data;
-	struct myaddrinfo *res, *res0;
-	hostrule_t *hstent;
-	long attempts = 0, locktime = 0; /* Avoid compiler warnings */
-	char *lockcmd = NULL, *unlockcmd = NULL; /* Avoid compiler warnings */
-	char buf[1024];
-	char *tmp;
-	int found = 0;
-	int mask;
-	int family;
-	int flags = 0;
+	char			*host = NULL;
+	datum			key, data;
+	struct myaddrinfo	*res, *res0;
+	hostrule_t		*hstent;
+	long			attempts = 0, locktime = 0;
+	char			*lockcmd = NULL;
+	char			*unlockcmd = NULL;
+	char			buf[1024], *tmp;
+	int			found = 0;
+	int			mask, family;
+	int			flags = 0, ret;
+	char			ch;
 
-	while ((ch = getopt(argc, argv, "h:a:t:l:u:d:v")) != -1) {
+	while ((ch = getopt(argc, argv, "a:h:l:r:t:u:v")) != -1) {
 		switch (ch) {
-		case 'v':
-			flags |= VFLAG;
-			break;
-
 		case 'a':
 			flags |= AFLAG;
 			if (strncmp(optarg, UNLIM, strlen(UNLIM)) == 0) {
@@ -339,12 +335,6 @@ handle_rulemod(argc, argv)
 				    optarg);
 			break;
 
-		case 't':
-			flags |= TFLAG;
-			if(parse_time(optarg, &locktime) != 0 || locktime < 0)
-				errx(EX_DATAERR, "invalid time: %s", optarg);
-			break;
-
 		case 'h':
 			flags |= HFLAG;
 			host = optarg;
@@ -355,13 +345,23 @@ handle_rulemod(argc, argv)
 			lockcmd = optarg;
 			break;
 
+		case 'r':
+			cfgdb = optarg;
+			break;
+
+		case 't':
+			flags |= TFLAG;
+			if(parse_time(optarg, &locktime) != 0 || locktime < 0)
+				errx(EX_DATAERR, "invalid time: %s", optarg);
+			break;
+
 		case 'u':
 			flags |= UFLAG;
 			unlockcmd = optarg;
 			break;
 
-		case 'd':
-			cfgdb = optarg;
+		case 'v':
+			flags |= VFLAG;
 			break;
 
 		default:
@@ -468,30 +468,28 @@ handle_ruledel(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, found = 0;
-	char *host = NULL;
-	datum key, data;
-	struct myaddrinfo *res, *res0;
-	hostrule_t *hstent;
-	char *tmp;
-	int mask;
-	char buf[1024];
-	int family;
-	int flags = 0;
+	char			*host = NULL;
+	char			buf[1024], *tmp;
+	datum			key, data;
+	struct myaddrinfo	*res, *res0;
+	hostrule_t		*hstent;
+	int			mask, family;
+	int			ret, flags = 0, found = 0;
+	char			ch;
 
-	while ((ch = getopt(argc, argv, "h:d:v")) != -1) {
+	while ((ch = getopt(argc, argv, "h:r:v")) != -1) {
 		switch (ch) {
-		case 'v':
-			flags |= VFLAG;
-			break;
-
 		case 'h':
 			flags |= HFLAG;
 			host = optarg;
 			break;
 
-		case 'd':
+		case 'r':
 			cfgdb = optarg;
+			break;
+
+		case 'v':
+			flags |= VFLAG;
 			break;
 
 		default:
@@ -579,14 +577,15 @@ handle_rulelist(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret;
-	datum key, data;
-	hostrule_t *hstent;
-	char buf[1024];
+	datum		key, data;
+	hostrule_t	*hstent;
+	char		buf[1024];
+	int		ret;
+	char		ch;
 
-	while ((ch = getopt(argc, argv, "d:")) != -1) {
+	while ((ch = getopt(argc, argv, "r:")) != -1) {
 		switch (ch) {
-		case 'd':
+		case 'r':
 			cfgdb = optarg;
 			break;
 
@@ -656,13 +655,14 @@ handle_ruleflush(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, i = 0;
-	datum key;
-	int flags = 0;
+	datum	key;
+	int	flags = 0;
+	int	ret, i;
+	char	ch;
 
-	while ((ch = getopt(argc, argv, "d:v")) != -1) {
+	while ((ch = getopt(argc, argv, "r:v")) != -1) {
 		switch (ch) {
-		case 'd':
+		case 'r':
 			cfgdb = optarg;
 			break;
 
@@ -684,6 +684,7 @@ handle_ruleflush(argc, argv)
 
 	atexit(cleanup);
 
+	i = 0;
 	for (key = dbm_firstkey(cfgdbp); key.dptr; key = dbm_nextkey(cfgdbp)) {
 		ret = dbm_delete(cfgdbp, key);
 		if (ret != 0)
@@ -702,20 +703,20 @@ handle_statdel(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret;
-	datum key;
-	char *host = NULL;
-	int flags = 0;
+	datum	key;
+	char	*host = NULL;
+	int	flags = 0, ret;
+	char	ch;
 
-	while ((ch = getopt(argc, argv, "d:h:v")) != -1) {
+	while ((ch = getopt(argc, argv, "h:s:v")) != -1) {
 		switch (ch) {
-		case 'd':
-			stdb = optarg;
-			break;
-
 		case 'h':
 			flags |= HFLAG;
 			host = optarg;
+			break;
+
+		case 's':
+			stdb = optarg;
 			break;
 
 		case 'v':
@@ -763,14 +764,14 @@ handle_statlist(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch;
-	datum key, data;
-	hostrec_t *hstrec;
-	char *tstr;
+	datum		key, data;
+	hostrec_t	*hstrec;
+	char		*tstr;
+	char		ch;
 
-	while ((ch = getopt(argc, argv, "d:")) != -1) {
+	while ((ch = getopt(argc, argv, "s:")) != -1) {
 		switch (ch) {
-		case 'd':
+		case 's':
 			stdb = optarg;
 			break;
 
@@ -819,18 +820,19 @@ handle_statflush(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret, i = 0;
 	datum key;
 	int flags = 0;
+	int ret, i;
+	char ch;
 
-	while ((ch = getopt(argc, argv, "vd:")) != -1) {
+	while ((ch = getopt(argc, argv, "s:v")) != -1) {
 		switch (ch) {
-		case 'v':
-			flags |= VFLAG;
+		case 's':
+			stdb = optarg;
 			break;
 
-		case 'd':
-			stdb = optarg;
+		case 'v':
+			flags |= VFLAG;
 			break;
 
 		default:
@@ -847,6 +849,7 @@ handle_statflush(argc, argv)
 
 	atexit(cleanup);
 
+	i = 0;
 	for (key = dbm_firstkey(stdbp); key.dptr; key = dbm_nextkey(stdbp)) {
 		ret = dbm_delete(stdbp, key);
 		if (ret != 0)
@@ -865,34 +868,34 @@ handle_lock(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret;
-	datum key, data;
-	hostrec_t hstrec;
-	hostrule_t *hstent;
-	char *host = NULL;
-	int flags = 0;
+	char		*host = NULL;
+	datum		key, data;
+	hostrec_t	hstrec;
+	hostrule_t	*hstent;
+	int		flags = 0, ret;
+	char		ch;
 
-	while ((ch = getopt(argc, argv, "h:s:r:fv")) != -1) {
+	while ((ch = getopt(argc, argv, "fh:r:s:v")) != -1) {
 		switch (ch) {
+		case 'f':
+			flags |= FFLAG;
+			break;
+
 		case 'h':
 			flags |= HFLAG;
 			host = optarg;
 			break;
 
-		case 'v':
-			flags |= VFLAG;
-			break;
-
-		case 'f':
-			flags |= FFLAG;
+		case 'r':
+			cfgdb = optarg;
 			break;
 
 		case 's':
 			stdb = optarg;
 			break;
 
-		case 'r':
-			cfgdb = optarg;
+		case 'v':
+			flags |= VFLAG;
 			break;
 
 		default:
@@ -968,34 +971,34 @@ handle_unlock(argc, argv)
 	int	argc;	
 	char	*argv[];
 {
-	int ch, ret;
-	datum key, data;
-	hostrec_t hstrec;
-	hostrule_t *hstent;
-	char *host = NULL;
-	int flags = 0;
+	char		*host = NULL;
+	datum		key, data;
+	hostrec_t	hstrec;
+	hostrule_t	*hstent;
+	int		flags = 0, ret;
+	char		ch;
 
-	while ((ch = getopt(argc, argv, "h:s:r:fv")) != -1) {
+	while ((ch = getopt(argc, argv, "fh:r:s:v")) != -1) {
 		switch (ch) {
+		case 'f':
+			flags |= FFLAG;
+			break;
+
 		case 'h':
 			flags |= HFLAG;
 			host = optarg;
 			break;
 
-		case 'v':
-			flags |= VFLAG;
-			break;
-
-		case 'f':
-			flags |= FFLAG;
+		case 'r':
+			cfgdb = optarg;
 			break;
 
 		case 's':
 			stdb = optarg;
 			break;
 
-		case 'r':
-			cfgdb = optarg;
+		case 'v':
+			flags |= VFLAG;
 			break;
 
 		default:
@@ -1073,7 +1076,7 @@ lock_host(host, hstrec, hstent, force)
 	const hostrule_t	*hstent;
 	int			force;
 {
-	char *env[2];
+	char	*env[2];
 
 	if (asprintf(&env[0], "PAM_RHOST=%s", host) < 0)
 		err(EX_OSERR, "malloc()");
@@ -1098,7 +1101,7 @@ unlock_host(host, hstrec, hstent, force)
 	const hostrule_t	*hstent;
 	int			force;
 {
-	char *env[2];
+	char	*env[2];
 
 	if (asprintf(&env[0], "PAM_RHOST=%s", host) < 0)
 		err(EX_OSERR, "malloc()");
