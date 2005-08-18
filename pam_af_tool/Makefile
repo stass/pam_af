@@ -5,7 +5,7 @@ BDECFLAGS=	-W -Wall -ansi -pedantic -Wbad-function-cast -Wcast-align \
 		-Wredundant-decls -Wshadow -Wstrict-prototypes -Wwrite-strings \
 		-std=c99
 
-CFLAGS+=	-I${.CURDIR}/../common ${BDECFLAGS} -gstabs
+CFLAGS+=	-I${.CURDIR}/../common ${BDECFLAGS}
 SRCS=		pam_af_tool.c subr.c
 NO_MAN=		1
 
