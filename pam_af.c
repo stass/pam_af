@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.11 2005/08/18 01:31:39 stas Exp $
+ * $Id: pam_af.c,v 1.12 2005/08/18 13:02:27 stas Exp $
  */
 
 #include <errno.h>
@@ -56,10 +56,11 @@
 #include "pam_af.h"
 #include "subr.h"
 
-/* Prototypes */
+/* Local prototypes */
 static char **	pam_af_build_env	__P((pam_handle_t *pamh));
 
-#define ENV_ITEM(item) {(item), #item}
+/* Local defines */
+#define ENV_ITEM(item) {(item), #item} /* Enviropment vars to set */
 static struct {
 	int item;
 	const char *name;
@@ -77,7 +78,11 @@ static struct {
 #define PAM_AF_LOG(...) \
 	openpam_log(PAM_LOG_VERBOSE, __VA_ARGS__)
 	
-
+/*
+ * The purpose of this routine is to set-up enviropment for external
+ * program's execution. This enviropment consists of PAM enviropment
+ * and items, defined in env_items.
+ */
 static char **
 pam_af_build_env(pamh)
 	pam_handle_t	*pamh;
@@ -153,7 +158,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	if ((tmp = openpam_get_option(pamh, "cfgdb")) != NULL)
 		cfgdb = tmp;	
 
-	/* Get hostname */
+	/* Known hostname is mandatory */
 	ret = pam_get_item(pamh, PAM_RHOST, (const void **)&host);
 	if (ret != PAM_SUCCESS) {
 		PAM_AF_LOGERR("can't get '%s' item", "PAM_RHOST");
@@ -165,9 +170,18 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	/* Open statistics database and obtain exclusive lock */
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
 	if (stdbp == NULL) {
-		PAM_AF_LOGERR("can't open '%s' database: %s", \
-		    stdb, strerror(errno));
-		PAM_RETURN(pam_err_ret);
+		/*
+		 * We need this because of PAM subsystem executes
+		 * this routines under user's credentials and we don't want
+		 * flood in system log.
+		 */
+		if (getuid() == 0) {
+			PAM_AF_LOGERR("can't open '%s' database: %s", \
+			    stdb, strerror(errno));
+			PAM_RETURN(pam_err_ret);
+		}
+		else
+			PAM_RETURN(PAM_SUCCESS);
 	}
 
 	key.dptr = host;
@@ -204,7 +218,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		}
 	}
 
-	/* Fetch rule for host, it can modify contents of DBM structures */
+	/* Fetch rule for host */
 	hostent = find_host_rule(cfgdb, host);
 	ASSERT(hostent)
 
@@ -245,10 +259,9 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		}
 	}
 
-	/* We need to restore this, as find_host_rule could change *dptr */
+	/* Save recent statistics */
 	data.dptr = (char *)&hstr;
 	data.dsize = sizeof(hstr);
-
 	ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 	if (ret != 0)
 		PAM_AF_LOGERR("can't update record: %s", strerror(ret));
@@ -287,9 +300,18 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	/* Open statistics database */
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
 	if (stdbp == NULL) {
-		PAM_AF_LOGERR("can't open '%s' database: %s", \
-		    stdb, strerror(errno));
-		PAM_RETURN(PAM_CRED_UNAVAIL);
+		/*
+		 * We need this because of PAM subsystem executes
+		 * this routines under user's credentials and we don't want
+		 * flood in system log.
+		 */
+		if (getuid() == 0) {
+			PAM_AF_LOGERR("can't open '%s' database: %s", \
+			    stdb, strerror(errno));
+			PAM_RETURN(PAM_CRED_UNAVAIL);
+		}
+		else
+			PAM_RETURN(PAM_SUCCESS);
 	}
 
 	/* Update records */

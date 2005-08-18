@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.15 2005/08/18 01:31:39 stas Exp $
+ * $Id: pam_af_tool.c,v 1.16 2005/08/18 13:02:27 stas Exp $
  */
 
 #include <errno.h>
@@ -55,9 +55,13 @@
 #include "pam_af.h"
 #include "subr.h"
 
-static const char *cfgdb = CFGDB;
-static const char *stdb = STATDB;
+/*
+ * This program allows to control behavour of pam_af module. It can load/
+ * modify/flush host rules, operate on statistic bases, lock and unlock
+ * hosts.
+ */
 
+/* Local prototypes */
 static void		usage			__P((void));
 int			main			__P((int argc, char **argv));
 static void		handle_ruleadd		__P((int argc, char **argv));
@@ -79,9 +83,16 @@ int			unlock_host		__P((const char *host, \
 						     const hostrule_t *hstent, \
 						     int force));
 
+/* Global data */
+static const char *cfgdb = CFGDB;
+static const char *stdb = STATDB;
+static DBM *stdbp = NULL;
+static DBM *cfgdbp = NULL;
+
+/* Local defines */
 #define UNLIM "unlimited"
 
-#define OPER(op) {#op, handle_##op}
+#define OPER(op) {#op, handle_##op} /* main targets for program */
 struct {
 	const char	*op;
 	void (*handler)(int, char **);
@@ -99,17 +110,14 @@ struct {
 };
 #define NOPS (sizeof(ops) / sizeof(*ops))
 	
-#define VFLAG 0x00000001
-#define FFLAG 0x00000002
-#define AFLAG 0x00000004
-#define TFLAG 0x00000008
-#define LFLAG 0x00000010
-#define UFLAG 0x00000020
-#define NFLAG 0x00000040
-#define HFLAG 0x00000080
-
-static DBM *stdbp = NULL;
-static DBM *cfgdbp = NULL;
+#define VFLAG 0x00000001 /* -v flag */
+#define FFLAG 0x00000002 /* -f flag */
+#define AFLAG 0x00000004 /* -a flag */
+#define TFLAG 0x00000008 /* -t flag */
+#define LFLAG 0x00000010 /* -l flag */
+#define UFLAG 0x00000020 /* -u flag */
+#define NFLAG 0x00000040 /* -n flag */
+#define HFLAG 0x00000080 /* -h flag */
 
 static void
 usage(void)
@@ -117,15 +125,15 @@ usage(void)
 	const char	*prog = getprogname();
 
 	(void)fprintf(stderr, "usage:\n"				\
-	    "\t%s ruleadd -h host -a attempts -t time"		\
+	    "\t%s ruleadd -h host -a attempts -t time"			\
 	    "\n\t\t[-l cmd] [-u cmd] [-r file] [-v]\n"			\
 	    "\t%s rulemod -h host [-a attempts] [-t time]"		\
 	    "\n\t\t[-l cmd] [-u cmd] [-r file] [-v]\n"			\
 	    "\t%s ruledel -h host [-r file] [-v]\n"			\
-	    "\t%s rulelist [-r file]\n"				\
+	    "\t%s rulelist [-r file]\n"					\
 	    "\t%s ruleflush [-r file] [-v]\n"				\
 	    "\t%s statdel -h host [-s file] [-v]\n"			\
-	    "\t%s statlist [-s file]\n"				\
+	    "\t%s statlist [-s file]\n"					\
 	    "\t%s statflush [-s file] [-v]\n"				\
 	    "\t%s lock [-h host] [-s file] [-r file] [-fv]\n"		\
 	    "\t%s unlock [-h host] [-s file] [-r file] [-fv]\n", 	\
@@ -156,6 +164,10 @@ main(argc, argv)
 	return 0;
 }	
 
+/*
+ * Default handler to execute in case of exit(). We must close bases to avoid 
+ * inconsistencies.
+ */
 static void cleanup(void)
 {
 	if (stdbp)
@@ -207,7 +219,7 @@ handle_ruleadd(argc, argv)
 			break;
 
 		case 'n':
-			dbflags = DBM_INSERT;
+			/* Do not replace existing records */
 			flags |= NFLAG;
 			break;
 
@@ -260,6 +272,11 @@ handle_ruleadd(argc, argv)
 	        hstent.mask = atoi(tmp);
 	}
 
+	/*
+         * We're assuming, that mask in 1-32 interval belongs to IPv4
+	 * addresses, 33-128 - to IPv6 addresses, masks for other address
+	 * families aren't supported. 0 means no mask.
+	 */
 	if (hstent.mask > 128)
 		errx(EX_DATAERR, "invalid mask: %d", hstent.mask);
 	else if (hstent.mask > 32)
@@ -390,6 +407,11 @@ handle_rulemod(argc, argv)
 	        mask = atoi(tmp);
 	}
 
+	/*
+         * We're assuming, that mask in 1-32 interval belongs to IPv4
+	 * addresses, 33-128 - to IPv6 addresses, masks for other address
+	 * families aren't supported. 0 means no mask.
+	 */
 	if (mask > 128)
 		errx(EX_DATAERR, "invalid mask: %d", mask);
 	else if (mask > 32)
@@ -421,7 +443,8 @@ handle_rulemod(argc, argv)
 			continue;
 		}
 		else if (data.dsize != sizeof(*hstent))
-			errx(EX_DATAERR, "database '%s' seriously broken", cfgdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", \
+			    cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
 
@@ -518,6 +541,11 @@ handle_ruledel(argc, argv)
 	        mask = atoi(tmp);
 	}
 
+	/*
+         * We're assuming, that mask in 1-32 interval belongs to IPv4
+	 * addresses, 33-128 - to IPv6 addresses, masks for other address
+	 * families aren't supported. 0 means no mask.
+	 */
 	if (mask > 128)
 		errx(EX_DATAERR, "invalid mask: %d", mask);
 	else if (mask > 32)
@@ -549,7 +577,8 @@ handle_ruledel(argc, argv)
 			continue;
 		}
 		else if (data.dsize != sizeof(*hstent))
-			errx(EX_DATAERR, "database '%s' seriously broken", cfgdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", \
+			    cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
 
@@ -616,7 +645,8 @@ handle_rulelist(argc, argv)
 			err(EX_OSERR, "can't fetch data");
 		}
 		else if (data.dsize != sizeof(*hstent))
-			errx(EX_DATAERR, "database '%s' seriously broken", cfgdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", \
+			    cfgdb);
 		else 
 			hstent = (hostrule_t *)data.dptr;
 
@@ -795,7 +825,8 @@ handle_statlist(argc, argv)
 		if (data.dptr == NULL)
 			err(EX_OSERR, "can't fetch data");
 		else if (data.dsize != sizeof(*hstrec))
-			errx(EX_DATAERR, "database '%s' seriously broken", stdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", \
+			    stdb);
 		else
 			hstrec = (hostrec_t *)data.dptr;
 
@@ -919,7 +950,8 @@ handle_lock(argc, argv)
 		if (data.dptr == NULL)
 			err(EX_OSERR, "can't fetch data");
 		else if (data.dsize != sizeof(hstrec))
-			errx(EX_DATAERR, "database '%s' seriously broken", stdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", \
+			    stdb);
 		else
 			bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
@@ -1022,7 +1054,8 @@ handle_unlock(argc, argv)
 		if (data.dptr == NULL)
 			err(EX_OSERR, "can't fetch data");
 		else if (data.dsize != sizeof(hstrec))
-			errx(EX_DATAERR, "database '%s' seriously broken", stdb);
+			errx(EX_DATAERR, "database '%s' seriously broken", \
+			    stdb);
 		else
 			bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
@@ -1069,6 +1102,10 @@ handle_unlock(argc, argv)
 	exit(EX_OK);
 }
 
+/*
+ * The purpose of this routine is to check if host must be locked or not,
+ * and to make locking work in true case.
+ */
 int
 lock_host(host, hstrec, hstent, force)
 	const char		*host;
@@ -1094,6 +1131,10 @@ lock_host(host, hstrec, hstent, force)
 	return 1;
 }
 
+/*
+ * The purpose of this routine is to check if host can be unlocked or not,
+ * and to make unlocking work in true case.
+ */
 int
 unlock_host(host, hstrec, hstent, force)
 	const char		*host;
