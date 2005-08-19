@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.17 2005/08/18 15:17:08 stas Exp $
+ * $Id: pam_af_tool.c,v 1.18 2005/08/19 01:55:14 stas Exp $
  */
 
 #include <errno.h>
@@ -326,7 +326,7 @@ handle_rulemod(argc, argv)
 	char	*argv[];
 {
 	char			*host = NULL;
-	datum			keym data;
+	datum			key, data;
 	struct myaddrinfo	*res, *res0;
 	hostrule_t		hstent;
 	long			attempts = 0, locktime = 0;
