@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $Id: pam_af.8,v 1.1 2005/08/19 01:55:14 stas Exp $
+.\" $Id: pam_af.8,v 1.2 2005/08/21 03:17:20 stas Exp $
 .\"
 .Dd August 18, 2005
 .Dt PAM_AF 8
@@ -44,30 +44,44 @@ The
 module for PAM, typically
 .Pa /usr/lib/pam_af.so ,
 provides functionality for PAM authentification category. The main purpose of
+the
 .Nm
 module is to prevent brute-force attacks against protected services, like
 SSH. Although, it is desirable for users to enforce strong passwords, weak
 password's practice are still very common. In these cases brute-force attack
 can be succesful. Also these attacks can mess-up system log with useless
-records, and system administrator can pass something important.
-.Ss The authentification stage
+records, and system administrator can pass something really important.
+.Pp
 The
 .Nm
-module maintains statistics for each host, that tries to authetificate. It
-stores the number of attempts and last attempt's timestamp. In the
-authetification stage the
+module is a shared object and can be loaded dynamically to provide the requred
+functionality to application. The following PAM functions are implemeted in
 .Nm
-module finds the configuration rule for given host and makes appropiate
-decision using failed attempt's count from host statistics. In case this
-number exceeds specified limit, host would be rejected and blocked for time,
-setted up in the host's rule. Additionally, external command can be executed
-in that case. This can be used, for example, to block the 'bad' host in
+module:
+.Bl -inset -offset indent
+.It Fn pam_sm_authenticate
+Use this function to check if the host can be authentificated or not. The
+.Nm
+module maintains statistics for each host, that tries to authetificate. It
+stores the number of attempts and last attempt's timestamp. When called. the
+authetification stage the
+.Fn pam_sm_authenticate
+function finds the configuration rule for given host and makes appropiate
+decision using failed attempt's count from host statistics. If this
+number exceeds configured limit, host would be rejected and blocked for time,
+specified in the host's rule. Additionally, external command can be executed
+in that case. It is useful, for example, to block the 'bad' host in
 firewall.
 .Pp
 Simillary, if the
 .Nm
 module detects the block time has been passed, it unlocks host and executes
 given external command.
+.It Fn pam_am_setcred
+This routine must be called after a successful login. The main objective of
+this function is to clear the host's statistics. It zerofies the attempts count
+and stores updated value in the backing storage.
+.El
 .Pp
 The following options may be passed to the authentication module:
 .Bl -tag -width indent
@@ -79,7 +93,7 @@ Report debugging information using
 level).
 .It Cm no_warn
 Suppress warning messages to the user. These messages include reasons why
-the user's attempt was denied.
+the auth attempt was denied.
 .It Cm allow_on_error
 By default, the
 .Nm
@@ -89,17 +103,18 @@ in this case.
 .Im Cm update_locked
 specify this option to force the
 .Nm
-module to update host's statistics even in case the host is locked. This can
+module to update host's statistics even if the host is locked. This can
 increase module's overhead. This option can be useful if you wants the lock
-time to be measured from last attempt.
+time to be measured from the last attempt.
 .It Cm statdb=file
 Use file as backing storage for statistics databse. By default
 .Pa /var/db/pam_af.db
-will be used. Attention : .db suffix will be added, so if you want,
+will be used. Notice: .db suffix will be added, so if you want,
 for example, to use
 .Pa /tmp/pam_af.db
-as backing storage, you must specify statdb=/tmp/pam_af as
-argument.
+as backing storage, you must specify
+.Cm statdb=/tmp/pam_af
+as argument.
 .It Cm cfgdb=file
 Use file as backing storage for configuration databse. By default
 .Pa /etc/pam_af.conf.db
