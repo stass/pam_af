@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2004-2005 Stanislav Sedov
+ * Copyright (c) 2004-2005 Stanislav Sedov <ssedov@mbsd.msk.ru>
  * Copyright (c) 2005 MBSD labs
  * Copyright (c) 2005 by 310.ru [Tridesyatoe], Moscow, Russian Federation
  * All rights reserved.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.18 2005/08/19 01:55:14 stas Exp $
+ * $Id: pam_af_tool.c,v 1.19 2005/08/25 02:17:52 stas Exp $
  */
 
 #include <errno.h>
