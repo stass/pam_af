@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.13 2005/08/25 02:17:52 stas Exp $
+ * $Id: subr.c,v 1.14 2005/08/25 02:25:08 stas Exp $
  */
 
 #include <errno.h>
@@ -153,8 +153,8 @@ my_gai_strerror(error)
 
 int
 my_getaddrinfo(host, family, pmai)
-	char	*host;
-	int	family;
+	char		*host;
+	int		family;
 	myaddrinfo_t	**pmai;
 {
 	struct addrinfo	hints, *res, *res0;
@@ -241,7 +241,7 @@ my_getaddrinfo(host, family, pmai)
 hostrule_t *
 find_host_rule(db, host)
 	const char	*db;
-	char	*host;
+	char		*host;
 {
 	datum			key, data;
 	struct			myaddrinfo *res0, *res;
