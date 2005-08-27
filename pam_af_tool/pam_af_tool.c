@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.19 2005/08/25 02:17:52 stas Exp $
+ * $Id: pam_af_tool.c,v 1.20 2005/08/27 15:12:36 stas Exp $
  */
 
 #include <errno.h>
@@ -312,7 +312,7 @@ handle_ruleadd(argc, argv)
 			    buf, sizeof(buf))) != 0)
 				errx(EX_OSERR, "can't get numeric address: %s",\
 				    gai_strerror(ret));
-			(void)fprintf(stderr, "Stored rule for %s.\n", buf);
+			(void)fprintf(stderr, "Stored rule for '%s'.\n", buf);
 		}
 	}
 	my_freeaddrinfo(res0);
