@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.13 2005/08/25 02:17:51 stas Exp $
+ * $Id: pam_af.c,v 1.14 2005/08/27 15:02:53 stas Exp $
  */
 
 #include <errno.h>
@@ -58,6 +58,7 @@
 
 /* Local prototypes */
 static char **	pam_af_build_env	__P((pam_handle_t *pamh));
+static void	pam_af_free_env		__P((char **env));
 
 /* Local defines */
 #define ENV_ITEM(item) {(item), #item} /* Enviropment vars to set */
@@ -78,6 +79,18 @@ static struct {
 #define PAM_AF_LOG(...) \
 	openpam_log(PAM_LOG_VERBOSE, __VA_ARGS__)
 	
+static void
+pam_af_free_env(env)
+	char	**env;
+{
+	uint	i;
+
+	for(i = 0; env[i] != NULL; i++)
+		free(env[i]);
+
+	free(env);
+}
+
 /*
  * The purpose of this routine is to set-up enviropment for external
  * program's execution. This enviropment consists of PAM enviropment
@@ -102,7 +115,7 @@ pam_af_build_env(pamh)
 		PAM_AF_LOGERR("malloc(%d): %s",
 		    items * sizeof(*env),
 		    strerror(errno));
-		openpam_free_envlist(env);
+		pam_af_free_env(env);
 		return NULL;
 	}
 	env = tmp;
@@ -267,7 +280,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		PAM_AF_LOGERR("can't update record: %s", strerror(ret));
 
 	dbm_close(stdbp);
-	openpam_free_envlist(env);
+	pam_af_free_env(env);
 
 	PAM_RETURN(pam_ret);
 }
