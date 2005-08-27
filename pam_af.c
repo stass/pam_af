@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.14 2005/08/27 15:02:53 stas Exp $
+ * $Id: pam_af.c,v 1.15 2005/08/27 15:19:05 stas Exp $
  */
 
 #include <errno.h>
@@ -104,7 +104,8 @@ pam_af_build_env(pamh)
 	int		items;
 	unsigned int	i;
 	char		**env, **tmp;
-	char		*item, *envstr;
+	char		*envstr;
+	void		*item;
 			
 	ASSERT(pamh)
 	env = pam_getenvlist(pamh);
@@ -126,7 +127,7 @@ pam_af_build_env(pamh)
 			PAM_AF_LOG("can't get %s item", env_items[i].name);
 			continue;
 		}
-		asprintf(&envstr, "%s=%s", env_items[i].name, item);
+		asprintf(&envstr, "%s=%s", env_items[i].name, (char *)item);
 		if (envstr == NULL) {
 			/* Maybe we'll be more lucky on next loop */
 			PAM_AF_LOGERR("can't allocate memory: %s", \
@@ -147,7 +148,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	int		argc __unused;
 	const char	*argv[] __unused;
 {
-	char		*host;
+	void		*host;
 	DBM		*stdbp;
 	const char	*cfgdb = CFGDB, *stdb = STATDB;
 	datum		key, data;
@@ -178,7 +179,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		PAM_RETURN(pam_err_ret);
 	}
 
-	PAM_AF_LOG("processing host '%s'", host);
+	PAM_AF_LOG("processing host '%s'", (char *)host);
 
 	/* Open statistics database and obtain exclusive lock */
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
@@ -197,8 +198,8 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 			PAM_RETURN(PAM_SUCCESS);
 	}
 
-	key.dptr = host;
-	key.dsize = strlen(host) + 1;
+	key.dptr = (char *)host;
+	key.dsize = strlen((char *)host) + 1;
 	curtime = time(NULL);
 
 	data = dbm_fetch(stdbp, key);
@@ -221,7 +222,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	if (hstr.locked_for != 0 && \
 	    (curtime - hstr.last_attempt) <= hstr.locked_for) {
 		PAM_AF_LOG("rejecting host '%s', its blocked for %ld since" \
-		    " %ld", host, hstr.locked_for, hstr.last_attempt);
+		    " %ld", (char *)host, hstr.locked_for, hstr.last_attempt);
 
 		pam_ret = PAM_AUTH_ERR;
 		if (update_when_locked == 0) {
@@ -232,7 +233,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	}
 
 	/* Fetch rule for host */
-	hostent = find_host_rule(cfgdb, host);
+	hostent = find_host_rule(cfgdb, (char *)host);
 	ASSERT(hostent)
 
 	/*
@@ -247,7 +248,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	/* Unlock host, if it was not rejected yet */
 	if (hstr.locked_for != 0 && pam_ret != PAM_AUTH_ERR) {
 		PAM_AF_LOG("unlocking host '%s' due the locktime has been " \
-		    "passed", host);
+		    "passed", (char *)host);
 		hstr.num = 0;
 		hstr.locked_for = 0;
 		pam_ret = PAM_SUCCESS;
@@ -264,7 +265,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	/* Lock host, if needed */
 	if (hstr.num > hostent->attempts && hostent->attempts != 0) {
-		PAM_AF_LOG("blocking host '%s'", host);
+		PAM_AF_LOG("blocking host '%s'", (char *)host);
 		hstr.locked_for = hostent->locktime;
 		pam_ret = PAM_AUTH_ERR;
 		if (strlen(hostent->lock_cmd) > 0) {
@@ -292,7 +293,7 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	int		argc __unused;
 	const char	*argv[] __unused;
 {
-	char		*host;
+	void		*host;
 	const char	*stdb = STATDB;
 	DBM		*stdbp;
 	datum		key, data;
