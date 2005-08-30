@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $Id: pam_af.8,v 1.5 2005/08/27 15:17:34 stas Exp $
+.\" $Id: pam_af.8,v 1.6 2005/08/30 20:34:54 stas Exp $
 .\"
 .Dd August 18, 2005
 .Dt PAM_AF 8
@@ -127,7 +127,7 @@ module to update host's statistics even if the host is locked. This can
 increase module's overhead. This option can be useful if you wants the lock
 time to be measured from the last attempt.
 .It Cm statdb=file
-Use file as backing storage for statistics databse. By default
+Use file as backing storage for the statistics databse. By default
 .Pa /var/db/pam_af.db
 will be used. Notice: .db suffix will be added, so if you want,
 for example, to use
@@ -136,7 +136,7 @@ as backing storage, you must specify
 .Cm statdb=/tmp/pam_af
 as argument.
 .It Cm cfgdb=file
-Use file as backing storage for configuration databse. By default
+Use file as backing storage for the configuration databse. By default
 .Pa /etc/pam_af.conf.db
 will be used. Above notice also has place.
 .El
