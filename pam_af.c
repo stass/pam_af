@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.15 2005/08/27 15:19:05 stas Exp $
+ * $Id: pam_af.c,v 1.16 2005/08/30 20:31:55 stas Exp $
  */
 
 #include <errno.h>
@@ -220,9 +220,9 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	
 	/* Reject host, if locktime interval wasn't passed */
 	if (hstr.locked_for != 0 && \
-	    (curtime - hstr.last_attempt) <= hstr.locked_for) {
+	    (unsigned)(curtime - hstr.last_attempt) <= hstr.locked_for) {
 		PAM_AF_LOG("rejecting host '%s', its blocked for %ld since" \
-		    " %ld", (char *)host, hstr.locked_for, hstr.last_attempt);
+		    " %d", (char *)host, hstr.locked_for, hstr.last_attempt);
 
 		pam_ret = PAM_AUTH_ERR;
 		if (update_when_locked == 0) {
@@ -264,7 +264,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	hstr.num++;
 
 	/* Lock host, if needed */
-	if (hstr.num > hostent->attempts && hostent->attempts != 0) {
+	if (hstr.num > hostent->attempts) {
 		PAM_AF_LOG("blocking host '%s'", (char *)host);
 		hstr.locked_for = hostent->locktime;
 		pam_ret = PAM_AUTH_ERR;

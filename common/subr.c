@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.14 2005/08/25 02:25:08 stas Exp $
+ * $Id: subr.c,v 1.15 2005/08/30 20:31:59 stas Exp $
  */
 
 #include <errno.h>
@@ -70,7 +70,28 @@
 # define LOGERR(...) openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
 #endif /* PAM_AF_DEFS */
 
-int my_getnameinfo(addr, addrlen, buf, buflen)
+char *
+pam_af_strdupn(p, len)
+	char	*p;
+	size_t	len;
+{
+	char	*str;
+
+	ASSERT(p);
+	ASSERT(len > 0);
+
+	str = malloc(len);
+	if (str == NULL)
+		err(EX_OSERR, "malloc()");
+
+	bcopy(p, str, len);
+	str[len] = '\0';
+
+	return str;
+}
+
+int
+my_getnameinfo(addr, addrlen, buf, buflen)
 	void	*addr;
 	size_t	addrlen;
 	char	*buf;
@@ -247,7 +268,7 @@ find_host_rule(db, host)
 	struct			myaddrinfo *res0, *res;
 	static hostrule_t	hstent;
 	int			found = 0;
-	int			mask;
+	uint			mask;
 	int			ret;
 	DBM			*dbp;
 
@@ -304,7 +325,7 @@ find_host_rule(db, host)
 			LOGERR("malloc: %s", strerror(errno));
 			goto nodb;
 		}
-		key.dsize = strlen(DEFRULE) + 1;
+		key.dsize = strlen(DEFRULE);
 		data = dbm_fetch(dbp, key);
 		free(key.dptr);
 	}
@@ -336,24 +357,24 @@ addr_cmp(addr1, addr2, addrlen, mask)
 	const void	*addr1;
 	const void	*addr2;
 	size_t		addrlen;
-	int32_t		mask;
+	uint		mask;
 {
-	register int bytes = mask / 8;
-	register int left = mask % 8;
+	register uint bytes = mask / 8;
+	register uint left = mask % 8;
 	register int8_t byte1 = 0, byte2 = 0;
 
 	ASSERT(addr1)
 	ASSERT(addr2)
 
-	if (mask > (signed)addrlen * 8)
+	if (mask > addrlen * 8)
 		return 1;
 	
 	if (bcmp(addr1, addr2, bytes) != 0)
 		return 1;
 
 	if (left != 0) {
-		byte1 = ((const int8_t *)addr1)[bytes];
-		byte1 = ((const int8_t *)addr2)[bytes];
+		byte1 = ((const char *)addr1)[bytes];
+		byte2 = ((const char *)addr2)[bytes];
 
 		byte1 >>= (8 - left);
 		byte2 >>= (8 - left);

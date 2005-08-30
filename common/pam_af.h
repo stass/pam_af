@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.h,v 1.6 2005/08/25 02:17:51 stas Exp $
+ * $Id: pam_af.h,v 1.7 2005/08/30 20:31:59 stas Exp $
  */
 #ifndef _PAM_AF_H_
 #define _PAM_AF_H_
@@ -56,19 +56,19 @@
 #endif
 
 typedef struct hostrec {
-	long	num;
-	long	last_attempt;
-	long	locked_for; /* Time the host blocked for, 0 if not blocked */
+	unsigned long	num;
+	time_t		last_attempt;
+	unsigned long	locked_for;
 } __packed hostrec_t;
 
 typedef struct hostrule {
-	int mask;
-	long attempts;
-	long locktime;
-	char lock_cmd[MAX_CMD_LEN];
-	char unlock_cmd[MAX_CMD_LEN];
+	uint mask;
+	unsigned long	attempts;
+	long		locktime;
+	char		lock_cmd[MAX_CMD_LEN];
+	char		unlock_cmd[MAX_CMD_LEN];
 } __packed hostrule_t;
-#define DEFAULT_ATTEMPTS	0
+#define DEFAULT_ATTEMPTS	ULONG_MAX
 #define DEFAULT_LOCKTIME	0
 #define DEFRULE "*"
 

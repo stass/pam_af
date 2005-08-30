@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.h,v 1.8 2005/08/25 02:17:52 stas Exp $
+ * $Id: subr.h,v 1.9 2005/08/30 20:31:59 stas Exp $
  */
 
 typedef struct myaddrinfo {
@@ -39,7 +39,7 @@ typedef struct myaddrinfo {
 int		addr_cmp		__P((const void *addr1,		\
 					     const void *addr2,		\
 					     size_t addrlen,		\
-					     int32_t mask));
+					     uint mask));
 int		exec_cmd		__P((const char *str, 		\
 					     char * const env[]));	\
 int		parse_time		__P((const char *str,		\
@@ -55,4 +55,5 @@ int		my_getnameinfo		__P((void *addr,		\
 					     size_t addrlen,		\
 					     char *buf,			\
 					     size_t buflen));
+char		*pam_af_strdupn		__P((char *p, size_t len));
 
