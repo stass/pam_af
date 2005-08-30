@@ -1,0 +1,249 @@
+.\" Copyright (c) 2005 Stanislav Sedov <ssedov@mbsd.msk.ru>
+.\" Copyright (c) 2005 MBSD labs
+.\" Copyright (c) 2005 by 310.ru [Tridesyatoe], Moscow, Russian Federation
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $Id: pam_af_tool.8,v 1.1 2005/08/30 21:55:13 stas Exp $
+.\"
+.Dd August 25, 2005
+.Dt PAM_AF_TOOL 8
+.Os
+.Sh NAME
+.Nm pam_af_tool
+.Nd pam_af(8) module control utility
+.Sh SYNOPSIS
+.\" --------------
+.Nm
+.Cm ruleadd
+.Fl h Ar host
+.Fl a Ar attempts
+.Fl t Ar time
+.Op Fl l cmd
+.Op Fl u cmd
+.Op Fl r file
+.Op Fl v
+.\" --------------
+.Nm
+.Cm rulemod
+.Fl h Ar host
+.Op Fl a Ar attempts
+.Op Fl t Ar time
+.Op Fl l cmd
+.Op Fl u cmd
+.Op Fl r file
+.Op Fl v
+.\" --------------
+.Nm
+.Cm ruledel
+.Fl h Ar host
+.Op Fl r file
+.Op Fl v
+.\" --------------
+.Nm
+.Cm rulelist
+.Op Fl r file
+.\" --------------
+.Nm
+.Cm ruleflush
+.Op Fl r file
+.Op Fl v
+.\" --------------
+.Nm
+.Cm statdel
+.Fl h Ar host
+.Op Fl s file
+.Op Fl v
+.\" --------------
+.Nm
+.Cm statlist
+.Op Fl s file
+.\" --------------
+.Nm
+.Cm statflush
+.Op Fl s file
+.Op Fl v
+.\" --------------
+.Nm
+.Cm lock
+.Op Fl h Ar host
+.Op Fl s file
+.Op Fl r file
+.Op Fl fv
+.\" --------------
+.Nm
+.Cm unlock
+.Op Fl h Ar host
+.Op Fl s file
+.Op Fl r file
+.Op Fl fv
+.\" --------------
+.Sh DESCRIPTION
+The
+.Nm
+utility can be used to control different aspects of the
+.Xr pam_af 8
+PAM module's logic. It can add/list/delete host-specific rules, list/delete the
+module's internal statistics, lock/unlock given hosts and so on. The following
+commands are available:
+.Bl -tag -width indent
+.It Cm ruleadd
+Add rule for the given host to the configuration database. The maximal auth
+attempts count must be specified using the
+.Dq Fl a
+option. Use the
+.Dq unlimited
+keyword to allow unlimited number of attempts. You must also give the
+locking period with the
+.Dq Fl t
+option. The time must be in the form like
+.Dq 10y16H10M ,
+i.e. the sequence of expressions
+.Dq #c ,
+where
+.Dq #
+- decimal integer and
+.Dq c
+- conversion specification. The list includes:
+.Cm y
+- for years,
+.Cm m
+- for mounts,
+.Cm d
+- days,
+.Cm H
+- hours,
+.Cm M
+- minutes and
+.Cm S
+for seconds.
+You may omit
+.Cm S
+specificator - it is the default conversion.
+.Pp
+The lock command can be specified with
+.Dq Fl l
+flag. Use
+.Dq Fl u
+to give the unlock command.
+.It Cm rulemod
+Modify the given parameters for the host's rule in the configuration database.
+.It Cm ruledel
+Delete rule from the configuration database.
+.It Cm rulelist
+List all rules.
+.It Cm ruleflush
+Flush all rules.
+.It Cm statdel
+Delete statistics on the given host.
+.It Cm statlist
+List the entire statistics.
+.It Cm statflush
+Flush statistics.
+.It Cm lock
+Lock the specified host. If the hostname isn't given the
+.Nm
+utilty will lock all hosts with max attempts count exceeded. Specify the
+.Dq Fl f
+option to force the host locking.
+.It Cm unlock
+Unlock the specified host. If the hostname isn't given the
+.Nm
+utilty will unlock all hosts that have bypassed locktime already. Specify the
+.Dq Fl f
+option to force the host unlocking.
+.El
+.Pp
+Available options:
+.Bl -tag -width indent
+.It Fl r Ar file
+use
+.Ar file
+as the configuration database.
+.It Fl s Ar file
+use
+.Ar file
+as the statistics database.
+.It Fl f
+force the operation to be completed.
+.It Fl v
+be more verbose.
+.El
+.\"-------------------------------
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, and >0 if an error occurs.
+.Sh EXAMPLES
+Add rule to limit the maximail fail auth attempts to 5 with 15 minutes locktime:
+.Pp
+.Dl "pam_af_tool ruleadd -h '*' -a 5 -t 15M"
+.Pp
+The following command can be used in FreeBSD to block
+.Dq bad
+hosts by firewall:
+.Pp
+.Dl "pam_af_tool ruleadd -h 207.46.0.0/16 -a 5 -t 15H -l '/sbin/ipfw add 100 deny all from $PAM_RHOST to any'"
+.Pp
+Change attempts limit to 15 for default rule:
+.Pp
+.Dl "pam_af_tool rulemod -h '*' -a 15M"
+.Pp
+Delete rule for
+.Dq 127.0.0.1 :
+.Pp
+.Dl "pam_af_tool ruledel -h 127.0.0.1"
+.Pp
+List internal per-host statistics:
+.Pp
+.Dl "pam_af_tool statlist"
+.Pp
+Delete staticstics for localhost:
+.Pp
+.Dl "pam_af_tool statdel -h localhost"
+.Pp
+Unlock all hosts that must be unlocked:
+.Pp
+.Dl "pam_af_tool unlock -f"
+.Pp
+This can be used, for example, in cron to periodicaly unlock hosts, that cannot be processed by the
+.Xr pam_af 8
+module, e.g. when they are blocked by firewall.
+.Sh SEE ALSO
+.Xr pam_af 8 ,
+.Xr ipfw 8 ,
+.Xr dbm 3 ,
+.Xr syslog 3 ,
+.Xr pam.conf 5 ,
+.Xr pam 8
+.Sh BUGS
+In lock and unlock commands of the
+.Nm
+utility only the
+.Ev PAM_RHOST
+enviropment variable would be set when executing external program.
+.Sh AUTHORS
+The
+.Nm
+utility and this manual page was written by
+.An Stanislav Sedov Aq ssedov@mbsd.msk.ru .
