@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.16 2005/08/30 20:31:55 stas Exp $
+ * $Id: pam_af.c,v 1.17 2005/08/30 22:24:39 stas Exp $
  */
 
 #include <errno.h>
@@ -48,7 +48,9 @@
 
 #define PAM_SM_AUTH
 
+#ifndef LINUX_PAM
 #include <security/pam_appl.h>
+#endif
 #include <security/pam_modules.h>
 #include <security/pam_mod_misc.h>
 #include <security/openpam.h>
@@ -77,7 +79,7 @@ static struct {
 #define PAM_AF_LOGERR(...) \
 	openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
 #define PAM_AF_LOG(...) \
-	openpam_log(PAM_LOG_VERBOSE, __VA_ARGS__)
+	PAM_LOG(__VA_ARGS__)
 	
 static void
 pam_af_free_env(env)
