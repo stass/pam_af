@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.17 2005/08/30 22:24:39 stas Exp $
+ * $Id: pam_af.c,v 1.18 2005/08/31 03:13:17 stas Exp $
  */
 
 #include <errno.h>
@@ -53,7 +53,9 @@
 #endif
 #include <security/pam_modules.h>
 #include <security/pam_mod_misc.h>
-#include <security/openpam.h>
+#ifdef _OPENPAM
+# include <security/openpam.h>
+#endif
 
 #include "pam_af.h"
 #include "subr.h"
@@ -61,6 +63,8 @@
 /* Local prototypes */
 static char **	pam_af_build_env	__P((pam_handle_t *pamh));
 static void	pam_af_free_env		__P((char **env));
+static const char * pam_af_get_option	__P((int optc, const char *optv[], \
+					     const char *opt0));
 
 /* Local defines */
 #define ENV_ITEM(item) {(item), #item} /* Enviropment vars to set */
@@ -76,11 +80,41 @@ static struct {
 };
 #define NITEMS (sizeof(env_items) / sizeof(*env_items))
 
-#define PAM_AF_LOGERR(...) \
+#ifdef _OPENPAM
+# define PAM_AF_LOGERR(...) \
 	openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
+#else
+# define PAM_AF_LOGERR(...)
+#endif
+
 #define PAM_AF_LOG(...) \
 	PAM_LOG(__VA_ARGS__)
 	
+static const char *
+pam_af_get_option(optc, optv, opt0)
+	int		optc;
+	const char	*optv[];
+	const char	*opt0;
+{
+	const char	*opt;
+	int		len;
+
+	ASSERT(optv);
+	ASSERT(opt0);
+
+	len = strlen(opt0);
+	while (optc--) {
+		opt = optv[optc];
+		if (strncmp(opt, opt0, len) == 0) {
+			if (opt[len] == '=')
+				len++;
+			return &opt[len];
+		}
+	}
+
+	return NULL;
+}
+
 static void
 pam_af_free_env(env)
 	char	**env;
@@ -147,8 +181,8 @@ PAM_EXTERN int
 pam_sm_authenticate(pamh, flags, argc, argv)
 	pam_handle_t	*pamh;
 	int		flags __unused;
-	int		argc __unused;
-	const char	*argv[] __unused;
+	int		argc;
+	const char	*argv[];
 {
 	void		*host;
 	DBM		*stdbp;
@@ -165,13 +199,13 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	int update_when_locked = 0; /* Update host stats when it's locked */
 
 	/* Get runtime configuration */
-	if (openpam_get_option(pamh, "allow_on_error") != NULL)
+	if (pam_af_get_option(argc, argv, "allow_on_error") != NULL)
 		pam_err_ret = PAM_SUCCESS; 
-	if (openpam_get_option(pamh, "update_locked") != NULL)
+	if (pam_af_get_option(argc, argv, "update_locked") != NULL)
 		update_when_locked = 1; 
-	if ((tmp = openpam_get_option(pamh, "statdb")) != NULL)
+	if ((tmp = pam_af_get_option(argc, argv, "statdb")) != NULL)
 		stdb = tmp;	
-	if ((tmp = openpam_get_option(pamh, "cfgdb")) != NULL)
+	if ((tmp = pam_af_get_option(argc, argv, "cfgdb")) != NULL)
 		cfgdb = tmp;	
 
 	/* Known hostname is mandatory */
