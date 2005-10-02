@@ -1,0 +1,9 @@
+# $Id: Makefile.freebsd,v 1.1 2005/10/02 08:20:07 stas Exp $
+CFLAGS+=	-I${.CURDIR}/common -I${.CURDIR} -DPAM_AF_DEFS
+LIB=		pam_af
+SRCS=		pam_af.c subr.c
+MAN=		pam_af.8
+
+.PATH:		${.CURDIR}/common
+
+.include <bsd.lib.mk>

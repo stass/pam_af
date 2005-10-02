@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.h,v 1.7 2005/08/30 20:31:59 stas Exp $
+ * $Id: pam_af.h,v 1.8 2005/10/02 08:20:07 stas Exp $
  */
 #ifndef _PAM_AF_H_
 #define _PAM_AF_H_
@@ -53,6 +53,18 @@
 #else
 # define ASSERT(exp)
 # define PASS
+#endif
+
+#ifndef __packed
+# define __packed __attribute__((packed))
+#endif
+
+#ifndef __unused
+# define __unused __attribute__((unused))
+#endif
+
+#ifndef PAM_RETURN
+# define PAM_RETURN return
 #endif
 
 typedef struct hostrec {

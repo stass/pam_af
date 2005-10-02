@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.21 2005/08/30 20:32:00 stas Exp $
+ * $Id: pam_af_tool.c,v 1.22 2005/10/02 08:20:07 stas Exp $
  */
 
 #include <errno.h>
@@ -41,6 +41,7 @@
 #include <paths.h>
 #include <assert.h>
 #include <sysexits.h>
+#include <time.h>
 #include <ndbm.h>
 
 #include <sys/cdefs.h>
@@ -116,7 +117,11 @@ struct {
 static void
 usage(void)
 {
+#ifdef FreeBSD
 	const char	*prog = getprogname();
+#else
+	const char	*prog = "pam_af_tool";
+#endif
 
 	(void)fprintf(stderr, "usage:\n"				\
 	    "\t%s ruleadd -h host -a attempts -t time"			\
@@ -251,8 +256,13 @@ handle_ruleadd(argc, argv)
 	dbflags = flags & NFLAG ? DBM_INSERT : DBM_REPLACE;
 
 	/* Open rules database */
+#ifdef O_EXLOCK
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_CREAT | O_EXLOCK, \
 	    CFGDB_PERM);
+#else
+	cfgdbp = dbm_open(cfgdb, O_RDWR | O_CREAT, \
+	    CFGDB_PERM);
+#endif
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
@@ -394,8 +404,13 @@ handle_rulemod(argc, argv)
 		/* NOTREACHED */
 
 	/* Open rules database */
+#ifdef O_EXLOCK
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
+#else
+	cfgdbp = dbm_open(cfgdb, O_RDWR, \
+	    CFGDB_PERM);
+#endif
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
@@ -533,8 +548,13 @@ handle_ruledel(argc, argv)
 		/* NOTREACHED */
 
 	/* Open rules database */
+#ifdef O_EXLOCK
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
+#else
+	cfgdbp = dbm_open(cfgdb, O_RDWR, \
+	    CFGDB_PERM);
+#endif
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
@@ -714,8 +734,13 @@ handle_ruleflush(argc, argv)
 	}
 
 	/* Open rules database */
+#ifdef O_EXLOCK
 	cfgdbp = dbm_open(cfgdb, O_RDWR | O_EXLOCK, \
 	    CFGDB_PERM);
+#else
+	cfgdbp = dbm_open(cfgdb, O_RDWR, \
+	    CFGDB_PERM);
+#endif
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
@@ -771,8 +796,13 @@ handle_statdel(argc, argv)
 		/* NOTREACHED */
 
 	/* Open statistics database */
+#ifdef O_EXLOCK
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
+#else
+	stdbp = dbm_open(stdb, O_RDWR, \
+	    STATDB_PERM);
+#endif
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  stdb);
 
@@ -880,8 +910,13 @@ handle_statflush(argc, argv)
 	}
 
 	/* Open rules database */
+#ifdef O_EXLOCK
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
+#else
+	stdbp = dbm_open(stdb, O_RDWR, \
+	    STATDB_PERM);
+#endif
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  stdb);
 
@@ -941,8 +976,13 @@ handle_lock(argc, argv)
 	}
 
 	/* Open statistics database */
+#ifdef O_EXLOCK
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
+#else
+	stdbp = dbm_open(stdb, O_RDWR, \
+	    STATDB_PERM);
+#endif
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  stdb);
 
@@ -1023,8 +1063,13 @@ handle_unlock(argc, argv)
 	}
 
 	/* Open statistics database */
+#ifdef O_EXLOCK
 	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
 	    STATDB_PERM);
+#else
+	stdbp = dbm_open(stdb, O_RDWR, \
+	    STATDB_PERM);
+#endif
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  stdb);
 

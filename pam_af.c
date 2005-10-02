@@ -25,8 +25,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.18 2005/08/31 03:13:17 stas Exp $
+ * $Id: pam_af.c,v 1.19 2005/10/02 08:20:07 stas Exp $
  */
+
+#ifdef __linux__
+# define _GNU_SOURCE
+#endif
 
 #include <errno.h>
 #include <stdlib.h>
@@ -36,6 +40,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 #include <syslog.h>
 #include <paths.h>
 #include <assert.h>
@@ -45,16 +50,15 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 
 #define PAM_SM_AUTH
 
-#ifndef LINUX_PAM
 #include <security/pam_appl.h>
-#endif
 #include <security/pam_modules.h>
-#include <security/pam_mod_misc.h>
 #ifdef _OPENPAM
 # include <security/openpam.h>
+# include <security/pam_mod_misc.h>
 #endif
 
 #include "pam_af.h"
@@ -84,11 +88,17 @@ static struct {
 # define PAM_AF_LOGERR(...) \
 	openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
 #else
-# define PAM_AF_LOGERR(...)
+# define PAM_AF_LOGERR(...) \
+	syslog(LOG_CRIT, __VA_ARGS__)
 #endif
 
-#define PAM_AF_LOG(...) \
+#ifdef _OPENPAM
+# define PAM_AF_LOG(...) \
 	PAM_LOG(__VA_ARGS__)
+#else
+# define PAM_AF_LOG(...) \
+	syslog(LOG_DEBUG, __VA_ARGS__)
+#endif
 	
 static const char *
 pam_af_get_option(optc, optv, opt0)
@@ -99,7 +109,6 @@ pam_af_get_option(optc, optv, opt0)
 	const char	*opt;
 	int		len;
 
-	ASSERT(optv);
 	ASSERT(opt0);
 
 	len = strlen(opt0);
@@ -149,7 +158,7 @@ pam_af_build_env(pamh)
 	for (items = 0; env[items] != NULL; items++);
 	tmp = realloc(env, (items + NITEMS + 1) * sizeof(*env));
 	if (tmp == NULL) {
-		PAM_AF_LOGERR("malloc(%d): %s",
+		PAM_AF_LOGERR("malloc(%d): %s\n",
 		    items * sizeof(*env),
 		    strerror(errno));
 		pam_af_free_env(env);
@@ -160,13 +169,13 @@ pam_af_build_env(pamh)
 		ret = pam_get_item(pamh, env_items[i].item,
 		    (const void **)&item);
 		if (ret != PAM_SUCCESS || item == NULL) {
-			PAM_AF_LOG("can't get %s item", env_items[i].name);
+			PAM_AF_LOG("can't get %s item\n", env_items[i].name);
 			continue;
 		}
 		asprintf(&envstr, "%s=%s", env_items[i].name, (char *)item);
 		if (envstr == NULL) {
 			/* Maybe we'll be more lucky on next loop */
-			PAM_AF_LOGERR("can't allocate memory: %s", \
+			PAM_AF_LOGERR("can't allocate memory: %s\n", \
 			    strerror(errno));
 			continue;
 		}
@@ -198,6 +207,10 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	int update_when_locked = 0; /* Update host stats when it's locked */
 
+#ifdef __linux__
+	openlog("pam_af", 0, LOG_AUTHPRIV);
+#endif
+
 	/* Get runtime configuration */
 	if (pam_af_get_option(argc, argv, "allow_on_error") != NULL)
 		pam_err_ret = PAM_SUCCESS; 
@@ -211,14 +224,18 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	/* Known hostname is mandatory */
 	ret = pam_get_item(pamh, PAM_RHOST, (const void **)&host);
 	if (ret != PAM_SUCCESS) {
-		PAM_AF_LOGERR("can't get '%s' item", "PAM_RHOST");
+		PAM_AF_LOGERR("can't get '%s' item\n", "PAM_RHOST");
 		PAM_RETURN(pam_err_ret);
 	}
 
-	PAM_AF_LOG("processing host '%s'", (char *)host);
+	PAM_AF_LOG("processing host '%s'\n", (char *)host);
 
 	/* Open statistics database and obtain exclusive lock */
+#ifdef O_EXLOCK
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
+#else
+	stdbp = dbm_open(stdb, O_RDWR | O_CREAT, STATDB_PERM);
+#endif
 	if (stdbp == NULL) {
 		/*
 		 * We need this because of PAM subsystem executes
@@ -226,13 +243,22 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		 * flood in system log.
 		 */
 		if (getuid() == 0) {
-			PAM_AF_LOGERR("can't open '%s' database: %s", \
+			PAM_AF_LOGERR("can't open '%s' database: %s\n", \
 			    stdb, strerror(errno));
 			PAM_RETURN(pam_err_ret);
 		}
 		else
 			PAM_RETURN(PAM_SUCCESS);
 	}
+
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0) {
+		PAM_AF_LOGERR("can't obtain exclusive lock on %s: %s\n",
+			stdb, strerror(errno));
+		PAM_RETURN(pam_err_ret);
+	}
+#endif
 
 	key.dptr = (char *)host;
 	key.dsize = strlen((char *)host) + 1;
@@ -241,14 +267,14 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	data = dbm_fetch(stdbp, key);
 	if (data.dptr == NULL) {
 		/* Not found */
-		PAM_AF_LOG("host record not found in statistics database");
+		PAM_AF_LOG("host record not found in statistics database\n");
 		hstr.num = 0;
 		hstr.locked_for = 0;
 	}
 	else {
-		PAM_AF_LOG("found host record in statistics database");
+		PAM_AF_LOG("found host record in statistics database\n");
 		if (data.dsize != sizeof(hstr)) {
-			PAM_AF_LOGERR("database '%s' seriously broken", stdb);
+			PAM_AF_LOGERR("database '%s' seriously broken\n", stdb);
 			PAM_RETURN(pam_err_ret);	
 		}
 		bcopy(data.dptr, &hstr, sizeof(hstr));
@@ -258,7 +284,8 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	if (hstr.locked_for != 0 && \
 	    (unsigned)(curtime - hstr.last_attempt) <= hstr.locked_for) {
 		PAM_AF_LOG("rejecting host '%s', its blocked for %ld since" \
-		    " %d", (char *)host, hstr.locked_for, hstr.last_attempt);
+		    " %ld\n", (char *)host, hstr.locked_for, \
+		    (long)hstr.last_attempt);
 
 		pam_ret = PAM_AUTH_ERR;
 		if (update_when_locked == 0) {
@@ -278,13 +305,13 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	 * by external commands to do host or user-specific work.
 	 */
 	if ((env = pam_af_build_env(pamh)) == NULL) {
-		PAM_AF_LOGERR("can't build env list");
+		PAM_AF_LOGERR("can't build env list\n");
 	}
 
 	/* Unlock host, if it was not rejected yet */
 	if (hstr.locked_for != 0 && pam_ret != PAM_AUTH_ERR) {
 		PAM_AF_LOG("unlocking host '%s' due the locktime has been " \
-		    "passed", (char *)host);
+		    "passed\n", (char *)host);
 		hstr.num = 0;
 		hstr.locked_for = 0;
 		pam_ret = PAM_SUCCESS;
@@ -301,7 +328,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	/* Lock host, if needed */
 	if (hstr.num > hostent->attempts) {
-		PAM_AF_LOG("blocking host '%s'", (char *)host);
+		PAM_AF_LOG("blocking host '%s'\n", (char *)host);
 		hstr.locked_for = hostent->locktime;
 		pam_ret = PAM_AUTH_ERR;
 		if (strlen(hostent->lock_cmd) > 0) {
@@ -314,7 +341,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	data.dsize = sizeof(hstr);
 	ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 	if (ret != 0)
-		PAM_AF_LOGERR("can't update record: %s", strerror(ret));
+		PAM_AF_LOGERR("can't update record: %s\n", strerror(ret));
 
 	dbm_close(stdbp);
 	pam_af_free_env(env);
@@ -326,8 +353,8 @@ PAM_EXTERN int
 pam_sm_setcred(pamh, flags, argc, argv)
 	pam_handle_t	*pamh;
 	int		flags __unused;
-	int		argc __unused;
-	const char	*argv[] __unused;
+	int		argc;
+	const char	*argv[];
 {
 	void		*host;
 	const char	*stdb = STATDB;
@@ -337,18 +364,27 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	const char	*tmp;
 	int		ret;
 
-	if ((tmp = openpam_get_option(pamh, "statdb")) != NULL)
+#ifdef __linux__
+	openlog("pam_af", 0, LOG_AUTHPRIV);
+#endif
+
+	if ((tmp = pam_af_get_option(argc, argv, "statdb")) != NULL)
 		stdb = tmp;	
 
 	/* Get peer host */
 	ret = pam_get_item(pamh, PAM_RHOST, (const void **)&host);
 	if (ret != PAM_SUCCESS) {
-		PAM_AF_LOGERR("can't get '%s' item", "PAM_RHOST");
+		PAM_AF_LOGERR("can't get '%s' item\n", "PAM_RHOST");
 		PAM_RETURN(PAM_SERVICE_ERR);
 	}
 
 	/* Open statistics database */
+#ifdef O_EXLOCK
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
+#else
+	stdbp = dbm_open(stdb, O_RDWR | O_CREAT, STATDB_PERM);
+#endif
+	
 	if (stdbp == NULL) {
 		/*
 		 * We need this because of PAM subsystem executes
@@ -356,13 +392,22 @@ pam_sm_setcred(pamh, flags, argc, argv)
 		 * flood in system log.
 		 */
 		if (getuid() == 0) {
-			PAM_AF_LOGERR("can't open '%s' database: %s", \
+			PAM_AF_LOGERR("can't open '%s' database: %s\n", \
 			    stdb, strerror(errno));
 			PAM_RETURN(PAM_CRED_UNAVAIL);
 		}
 		else
 			PAM_RETURN(PAM_SUCCESS);
 	}
+
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0) {
+		PAM_AF_LOGERR("can't obtain exclusive lock on %s: %s\n",
+			stdb, strerror(errno));
+		PAM_RETURN(PAM_CRED_UNAVAIL);
+	}
+#endif
 
 	/* Update records */
 	hstr.num = 0;
@@ -376,7 +421,7 @@ pam_sm_setcred(pamh, flags, argc, argv)
 
 	ret = dbm_store(stdbp, key, data, DBM_REPLACE);
 	if (ret != 0)
-		PAM_AF_LOGERR("can't update record: %s", \
+		PAM_AF_LOGERR("can't update record: %s\n", \
 		    strerror(ret));
 
 	dbm_close(stdbp);
@@ -384,4 +429,6 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	PAM_RETURN(PAM_SUCCESS);
 }
 
+#ifdef _OPENPAM
 PAM_MODULE_ENTRY("pam_af");
+#endif
