@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.h,v 1.9 2005/08/30 20:31:59 stas Exp $
+ * $Id: subr.h,v 1.10 2005/10/06 15:18:02 stas Exp $
  */
 
 typedef struct myaddrinfo {

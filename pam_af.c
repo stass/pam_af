@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.19 2005/10/02 08:20:07 stas Exp $
+ * $Id: pam_af.c,v 1.20 2005/10/06 15:18:00 stas Exp $
  */
 
 #ifdef __linux__
@@ -158,7 +158,7 @@ pam_af_build_env(pamh)
 	for (items = 0; env[items] != NULL; items++);
 	tmp = realloc(env, (items + NITEMS + 1) * sizeof(*env));
 	if (tmp == NULL) {
-		PAM_AF_LOGERR("malloc(%d): %s\n",
+		PAM_AF_LOGERR("malloc(%ld): %s\n",
 		    items * sizeof(*env),
 		    strerror(errno));
 		pam_af_free_env(env);
@@ -230,6 +230,10 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	PAM_AF_LOG("processing host '%s'\n", (char *)host);
 
+	/* Fetch rule for host */
+	hostent = find_host_rule(cfgdb, (char *)host);
+	ASSERT(hostent)
+
 	/* Open statistics database and obtain exclusive lock */
 #ifdef O_EXLOCK
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
@@ -256,6 +260,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0) {
 		PAM_AF_LOGERR("can't obtain exclusive lock on %s: %s\n",
 			stdb, strerror(errno));
+		dbm_close(stdbp);
 		PAM_RETURN(pam_err_ret);
 	}
 #endif
@@ -275,6 +280,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		PAM_AF_LOG("found host record in statistics database\n");
 		if (data.dsize != sizeof(hstr)) {
 			PAM_AF_LOGERR("database '%s' seriously broken\n", stdb);
+			dbm_close(stdbp);
 			PAM_RETURN(pam_err_ret);	
 		}
 		bcopy(data.dptr, &hstr, sizeof(hstr));
@@ -294,10 +300,6 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 			PAM_RETURN(pam_ret);
 		}
 	}
-
-	/* Fetch rule for host */
-	hostent = find_host_rule(cfgdb, (char *)host);
-	ASSERT(hostent)
 
 	/*
 	 * Build enviropment, includind PAM_RHOST, PAM_RUSER, PAM_USER,
@@ -405,6 +407,7 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0) {
 		PAM_AF_LOGERR("can't obtain exclusive lock on %s: %s\n",
 			stdb, strerror(errno));
+		dbm_close(stdbp);
 		PAM_RETURN(PAM_CRED_UNAVAIL);
 	}
 #endif

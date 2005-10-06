@@ -1,6 +1,6 @@
 # Main cmake-file for pam_af
 #
-# $Id: CMakeLists.txt,v 1.2 2005/10/02 08:20:07 stas Exp $
+# $Id: CMakeLists.txt,v 1.3 2005/10/06 15:18:00 stas Exp $
 
 PROJECT(PAM_AF)
 
@@ -16,7 +16,7 @@ IF(CMAKE_COMPILER_IS_GNUCC_RUN)
 	SET_SOURCE_FILES_PROPERTIES(${PAM_AF_SOURCE_DIR}/pam_af.c 
 	${PAM_AF_SOURCE_DIR}/common/subr.c
 	${PAM_AF_SOURCE_DIR}/pam_af_tool/pam_af_tool.c PROPERTIES
-	COMPILE_FLAGS "-Wall -Wsystem-headers -Werror -Wno-format-y2k -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wshadow -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wnested-externs -Wredundant-decls")
+	COMPILE_FLAGS "-Wall -Wsystem-headers -Werror -Wno-format-y2k -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wshadow -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wnested-externs")
 ENDIF(CMAKE_COMPILER_IS_GNUCC_RUN)
 
 INSTALL_TARGETS(/lib pam_af)

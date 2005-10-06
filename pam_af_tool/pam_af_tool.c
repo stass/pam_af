@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.22 2005/10/02 08:20:07 stas Exp $
+ * $Id: pam_af_tool.c,v 1.23 2005/10/06 15:18:03 stas Exp $
  */
 
 #include <errno.h>
@@ -266,6 +266,12 @@ handle_ruleadd(argc, argv)
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(cfgdbp), LOCK_EX) != 0)
+		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", cfgdb);
+#endif
+
 	atexit(cleanup);
 
 	/* Extract mask specification from hostname */
@@ -414,6 +420,12 @@ handle_rulemod(argc, argv)
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(cfgdbp), LOCK_EX) != 0)
+		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", cfgdb);
+#endif
+
 	atexit(cleanup);
 
 	/* Extract mask specification from hostname */
@@ -557,6 +569,12 @@ handle_ruledel(argc, argv)
 #endif
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  cfgdb);
+
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(cfgdbp), LOCK_EX) != 0)
+		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", cfgdb);
+#endif
 
 	atexit(cleanup);
 
@@ -744,6 +762,12 @@ handle_ruleflush(argc, argv)
 	if (cfgdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  cfgdb);
 
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(cfgdbp), LOCK_EX) != 0)
+		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", cfgdb);
+#endif
+
 	atexit(cleanup);
 
 	i = 0;
@@ -805,6 +829,12 @@ handle_statdel(argc, argv)
 #endif
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  stdb);
+
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0)
+		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", stdb);
+#endif
 
 	atexit(cleanup);
 
@@ -920,6 +950,12 @@ handle_statflush(argc, argv)
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  stdb);
 
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0)
+		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", stdb);
+#endif
+
 	atexit(cleanup);
 
 	i = 0;
@@ -945,6 +981,11 @@ handle_lock(argc, argv)
 	int		flags = 0, ret;
 	datum		key;
 	char		ch;
+	struct host_list {
+		char			*host;
+		struct host_list	*next;
+	} *hosts = NULL, *hosts0, **hstp;
+		
 
 	while ((ch = getopt(argc, argv, "fh:r:s:v")) != -1) {
 		switch (ch) {
@@ -976,13 +1017,8 @@ handle_lock(argc, argv)
 	}
 
 	/* Open statistics database */
-#ifdef O_EXLOCK
-	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
+	stdbp = dbm_open(stdb, O_RDONLY, \
 	    STATDB_PERM);
-#else
-	stdbp = dbm_open(stdb, O_RDWR, \
-	    STATDB_PERM);
-#endif
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  stdb);
 
@@ -996,28 +1032,35 @@ handle_lock(argc, argv)
 		exit(EX_OK);
 	}
 
-	key = dbm_firstkey(stdbp);
-	while (key.dptr) {
+	hstp = &hosts;
+	for (key = dbm_firstkey(stdbp); key.dptr; key = dbm_nextkey(stdbp)) {
 		if (key.dsize <= 0)
 			errx(EX_OSERR, "database %s seriously broken", stdb);
 
-		host = pam_af_strdupn(key.dptr, key.dsize);
-		if (host == NULL)
+		*hstp = malloc(sizeof(struct host_list));
+		if (*hstp == NULL)
 			err(EX_OSERR, "malloc()");
 
-		ret = lock_host(host, flags & FFLAG);
-		if (ret == 0) {
-			/* We must reset database */
-			key = dbm_firstkey(stdbp);
-			if (flags & VFLAG)
-				fprintf(stderr, "Host '%s' is now locked.\n", \
-				    host);
-		}
-		else
-			/* Retrive the next key */
-			key = dbm_nextkey(stdbp);
+		bzero(*hstp, sizeof(struct host_list));
+		(*hstp)->host = pam_af_strdupn(key.dptr, key.dsize);
+		if ((*hstp)->host == NULL)
+			err(EX_OSERR, "malloc()");
 
-		free(host);
+		hstp = &((*hstp)->next);
+	}
+	
+	dbm_close(stdbp);
+	stdbp = NULL;
+
+	while(hosts) {
+		ret = lock_host(hosts->host, flags & FFLAG);
+		if (ret == 0 && (flags & VFLAG))
+			fprintf(stderr, "Host '%s' is now locked.\n", \
+				    hosts->host);
+		hosts0 = hosts;
+		hosts = hosts->next;
+		free(hosts0->host);
+		free(hosts0);
 	}
 
 	exit(EX_OK);
@@ -1032,6 +1075,11 @@ handle_unlock(argc, argv)
 	int		flags = 0, ret;
 	datum		key;
 	char		ch;
+	struct host_list {
+		char			*host;
+		struct host_list	*next;
+	} *hosts = NULL, *hosts0, **hstp;
+		
 
 	while ((ch = getopt(argc, argv, "fh:r:s:v")) != -1) {
 		switch (ch) {
@@ -1063,13 +1111,8 @@ handle_unlock(argc, argv)
 	}
 
 	/* Open statistics database */
-#ifdef O_EXLOCK
-	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
+	stdbp = dbm_open(stdb, O_RDONLY, \
 	    STATDB_PERM);
-#else
-	stdbp = dbm_open(stdb, O_RDWR, \
-	    STATDB_PERM);
-#endif
 	if (stdbp == NULL)
 		err(EX_IOERR, "can't open '%s' database",  stdb);
 
@@ -1078,32 +1121,40 @@ handle_unlock(argc, argv)
 	if (flags & HFLAG) {
 		ret = unlock_host(host, flags & FFLAG);
 		if (ret == 0 && (flags & VFLAG))
-			fprintf(stderr, "Host '%s' is now unlocked.\n", host);
+			fprintf(stderr, "Host '%s' is now locked.\n", host);
 		
 		exit(EX_OK);
 	}
 
-	key = dbm_firstkey(stdbp);
-	while (key.dptr) {
+	hstp = &hosts;
+	for (key = dbm_firstkey(stdbp); key.dptr; key = dbm_nextkey(stdbp)) {
 		if (key.dsize <= 0)
 			errx(EX_OSERR, "database %s seriously broken", stdb);
-		host = pam_af_strdupn(key.dptr, key.dsize);
-		if (host == NULL)
+
+		*hstp = malloc(sizeof(struct host_list));
+		if (*hstp == NULL)
 			err(EX_OSERR, "malloc()");
 
-		ret = unlock_host(host, flags & FFLAG);
-		if (ret == 0) {
-			/* We must reset database */
-			key = dbm_firstkey(stdbp);
-			if (flags & VFLAG)
-				fprintf(stderr, "Host '%s' is now unlocked.\n",\
-				    host);
-		}
-		else
-			/* Retrive the next key */
-			key = dbm_nextkey(stdbp);
+		bzero(*hstp, sizeof(struct host_list));
+		(*hstp)->host = pam_af_strdupn(key.dptr, key.dsize);
+		if ((*hstp)->host == NULL)
+			err(EX_OSERR, "malloc()");
 
-		free(host);
+		hstp = &((*hstp)->next);
+	}
+	
+	dbm_close(stdbp);
+	stdbp = NULL;
+
+	while(hosts) {
+		ret = unlock_host(hosts->host, flags & FFLAG);
+		if (ret == 0 && (flags & VFLAG))
+			fprintf(stderr, "Host '%s' is now unlocked.\n", \
+				    hosts->host);
+		hosts0 = hosts;
+		hosts = hosts->next;
+		free(hosts0->host);
+		free(hosts0);
 	}
 
 	exit(EX_OK);
@@ -1133,6 +1184,27 @@ lock_host(host, force)
 	/*
 	 * Get rule for this host
 	 */
+
+	/* find_host_rule returns pointer to it's static data */
+	hstent = find_host_rule(cfgdb, host);
+	ASSERT(hstent);
+
+	/* Open statistics database */
+#ifdef O_EXLOCK
+	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
+	    STATDB_PERM);
+#else
+	stdbp = dbm_open(stdb, O_RDWR, \
+	    STATDB_PERM);
+#endif
+	if (stdbp == NULL)
+		err(EX_IOERR, "can't open '%s' database",  stdb);
+
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0)
+		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", stdb);
+#endif
 	key.dptr = host;
 	key.dsize = strlen(host) + 1;
 	data = dbm_fetch(stdbp, key);
@@ -1144,16 +1216,15 @@ lock_host(host, force)
 	else
 		bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
-	/* find_host_rule returns pointer to it's static data */
-	hstent = find_host_rule(cfgdb, host);
-	ASSERT(hstent);
-
-	if (hstrec.locked_for == 0 && 
+	if (hstrec.locked_for == 0 && hstent->locktime != 0 &&
 	    ((hstrec.num >= hstent->attempts) || force != 0)) {
 		hstrec.locked_for = hstent->locktime;
 		hstrec.last_attempt = time(NULL);
 		if (hstent->lock_cmd != NULL)
 			(void)exec_cmd(hstent->lock_cmd, env);
+
+		/* Free asprintf-allocated buffer */
+		free(env[0]);
 
 		/* Restore all structures - some implemetations can break it */
 		data.dptr = (char *)&hstrec;
@@ -1164,9 +1235,13 @@ lock_host(host, force)
 		if (dbm_store(stdbp, key, data, DBM_REPLACE) != 0)
 			err(EX_OSERR, "can't store record");
 
+		dbm_close(stdbp);
+		stdbp = NULL;
 		return 0;
 	}
 
+	dbm_close(stdbp);
+	stdbp = NULL;
 	return 1;
 }
 
@@ -1194,6 +1269,27 @@ unlock_host(host, force)
 	/*
 	 * Get rule for this host
 	 */
+
+	/* find_host_rule returns pointer to it's static data */
+	hstent = find_host_rule(cfgdb, host);
+	ASSERT(hstent);
+
+	/* Open statistics database */
+#ifdef O_EXLOCK
+	stdbp = dbm_open(stdb, O_RDWR | O_EXLOCK, \
+	    STATDB_PERM);
+#else
+	stdbp = dbm_open(stdb, O_RDWR, \
+	    STATDB_PERM);
+#endif
+	if (stdbp == NULL)
+		err(EX_IOERR, "can't open '%s' database",  stdb);
+
+#ifndef O_EXLOCK
+	/* If we can't obtain lock through open(2) */
+	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0)
+		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", stdb);
+#endif
 	key.dptr = host;
 	key.dsize = strlen(host) + 1;
 	data = dbm_fetch(stdbp, key);
@@ -1205,16 +1301,15 @@ unlock_host(host, force)
 	else
 		bcopy(data.dptr, &hstrec, sizeof(hstrec));
 
-	/* find_host_rule returns pointer to it's static data */
-	hstent = find_host_rule(cfgdb, host);
-	ASSERT(hstent);
-
 	if ((hstrec.last_attempt + hstrec.locked_for < (unsigned)time(NULL) || \
 	    force != 0) && hstrec.locked_for != 0) {
 		hstrec.locked_for = 0;
 		hstrec.num = 0;
 		if (hstent->unlock_cmd != NULL)
 			(void)exec_cmd(hstent->unlock_cmd, env);
+
+		/* Free asprintf-allocated buffer */
+		free(env[0]);
 
 		/* Restore all structures - some implemetations can break it */
 		data.dptr = (char *)&hstrec;
@@ -1225,8 +1320,12 @@ unlock_host(host, force)
 		if (dbm_store(stdbp, key, data, DBM_REPLACE) != 0)
 			err(EX_OSERR, "can't store record");
 
+		dbm_close(stdbp);
+		stdbp = NULL;
 		return 0;
 	}
 
+	dbm_close(stdbp);
+	stdbp = NULL;
 	return 1;
 }

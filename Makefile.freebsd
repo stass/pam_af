@@ -1,4 +1,4 @@
-# $Id: Makefile.freebsd,v 1.1 2005/10/02 08:20:07 stas Exp $
+# $Id: Makefile.freebsd,v 1.2 2005/10/06 15:18:00 stas Exp $
 CFLAGS+=	-I${.CURDIR}/common -I${.CURDIR} -DPAM_AF_DEFS
 LIB=		pam_af
 SRCS=		pam_af.c subr.c

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.15 2005/08/30 20:31:59 stas Exp $
+ * $Id: subr.c,v 1.16 2005/10/06 15:18:02 stas Exp $
  */
 
 #include <errno.h>
@@ -291,7 +291,6 @@ find_host_rule(db, host)
 	}
 
 	for (res = res0; res && !found; res = res->next) {
-
 		for (key = dbm_firstkey(dbp); key.dptr; key = dbm_nextkey(dbp))
 		{
 			ASSERT(res->addr)
@@ -399,7 +398,7 @@ parse_time(str, ptime)
 	ASSERT(str)
 	ASSERT(ptime)
 
-	for (i = strtol(str, &p, 0); *p != '\0'; i = strtol(++p, &p, 0)) {
+	for (i = strtol(str, &p, 0); *p != '\0'; p++, i = strtol(p, &p, 0)) {
 		if (i <= 0)
 			return 1;
 		switch (*p) {

@@ -1,6 +1,6 @@
 # Main cmake-file for pam_af_tool
 #
-# $Id: CMakeLists.txt,v 1.1 2005/09/22 03:56:20 stas Exp $
+# $Id: CMakeLists.txt,v 1.2 2005/10/06 15:18:03 stas Exp $
 
 ADD_EXECUTABLE(pam_af_tool pam_af_tool.c ${PAM_AF_SOURCE_DIR}/common/subr.c)
 INCLUDE_DIRECTORIES(${PAM_AF_SOURCE_DIR}/common)

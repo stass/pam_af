@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.h,v 1.8 2005/10/02 08:20:07 stas Exp $
+ * $Id: pam_af.h,v 1.9 2005/10/06 15:18:02 stas Exp $
  */
 #ifndef _PAM_AF_H_
 #define _PAM_AF_H_
