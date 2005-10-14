@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.h,v 1.10 2005/10/06 15:18:02 stas Exp $
+ * $Id: subr.h,v 1.11 2005/10/14 04:14:53 stas Exp $
  */
 
 typedef struct myaddrinfo {
@@ -34,8 +34,9 @@ typedef struct myaddrinfo {
 	size_t			addrlen;
 } myaddrinfo_t;
 
-/* Prototypes */
+extern const char *progname;
 
+/* Prototypes */
 int		addr_cmp		__P((const void *addr1,		\
 					     const void *addr2,		\
 					     size_t addrlen,		\
@@ -57,3 +58,11 @@ int		my_getnameinfo		__P((void *addr,		\
 					     size_t buflen));
 char		*pam_af_strdupn		__P((char *p, size_t len));
 
+/* Compatiblity routines */
+#ifndef _HAVE_ERR_H_
+void		err			__P((int err_code,		\
+					     const char *format, ...));
+void		errx			__P((int err_code,		\
+					     const char *format, ...));
+void		warnx			__P((const char *format, ...));
+#endif /* _HAVE_ERR_H_ */

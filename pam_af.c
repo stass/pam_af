@@ -25,28 +25,23 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.20 2005/10/06 15:18:00 stas Exp $
+ * $Id: pam_af.c,v 1.21 2005/10/14 04:14:53 stas Exp $
  */
-
-#ifdef __linux__
-# define _GNU_SOURCE
-#endif
 
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdint.h>
 #include <limits.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
 #include <syslog.h>
-#include <paths.h>
 #include <assert.h>
 #include <ndbm.h>
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -63,6 +58,9 @@
 
 #include "pam_af.h"
 #include "subr.h"
+
+/* For err()-like routines */
+const char	*progname = "pam_af";
 
 /* Local prototypes */
 static char **	pam_af_build_env	__P((pam_handle_t *pamh));
@@ -159,26 +157,33 @@ pam_af_build_env(pamh)
 	tmp = realloc(env, (items + NITEMS + 1) * sizeof(*env));
 	if (tmp == NULL) {
 		PAM_AF_LOGERR("malloc(%ld): %s\n",
-		    items * sizeof(*env),
+		    (long)(items * sizeof(*env)),
 		    strerror(errno));
 		pam_af_free_env(env);
 		return NULL;
 	}
 	env = tmp;
 	for (i = 0; i < NITEMS; i++) {
+#ifndef _SUN_PAM_
 		ret = pam_get_item(pamh, env_items[i].item,
 		    (const void **)&item);
+#else /* _SUN_PAM_ */
+		ret = pam_get_item(pamh, env_items[i].item,
+		    (void **)&item);
+#endif /* _SUN_PAM_ */
 		if (ret != PAM_SUCCESS || item == NULL) {
 			PAM_AF_LOG("can't get %s item\n", env_items[i].name);
 			continue;
 		}
-		asprintf(&envstr, "%s=%s", env_items[i].name, (char *)item);
+//		asprintf(&envstr, "%s=%s", env_items[i].name, (char *)item);
+		envstr = (char *)malloc(strlen(env_items[i].name) + strlen((char *)item) + 2);
 		if (envstr == NULL) {
 			/* Maybe we'll be more lucky on next loop */
 			PAM_AF_LOGERR("can't allocate memory: %s\n", \
 			    strerror(errno));
 			continue;
 		}
+		sprintf(envstr, "%s=%s", env_items[i].name, (char *)item);
 		env[items++] = envstr;
 		env[items] = NULL;
 	}
@@ -222,7 +227,11 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		cfgdb = tmp;	
 
 	/* Known hostname is mandatory */
+#ifndef _SUN_PAM_
 	ret = pam_get_item(pamh, PAM_RHOST, (const void **)&host);
+#else /* _SUN_PAM_ */
+	ret = pam_get_item(pamh, PAM_RHOST, (void **)&host);
+#endif /* _SUN_PAM_ */
 	if (ret != PAM_SUCCESS) {
 		PAM_AF_LOGERR("can't get '%s' item\n", "PAM_RHOST");
 		PAM_RETURN(pam_err_ret);
@@ -374,7 +383,11 @@ pam_sm_setcred(pamh, flags, argc, argv)
 		stdb = tmp;	
 
 	/* Get peer host */
+#ifndef _SUN_PAM_
 	ret = pam_get_item(pamh, PAM_RHOST, (const void **)&host);
+#else /* _SUN_PAM_ */
+	ret = pam_get_item(pamh, PAM_RHOST, (void **)&host);
+#endif /* _SUN_PAM_ */
 	if (ret != PAM_SUCCESS) {
 		PAM_AF_LOGERR("can't get '%s' item\n", "PAM_RHOST");
 		PAM_RETURN(PAM_SERVICE_ERR);

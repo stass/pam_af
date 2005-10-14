@@ -25,31 +25,51 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.16 2005/10/06 15:18:02 stas Exp $
+ * $Id: subr.c,v 1.17 2005/10/14 04:14:53 stas Exp $
  */
 
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdint.h>
 #include <limits.h>
 #include <unistd.h>
-#include <paths.h>
+#ifdef _HAVE_PATHS_H_
+# include <paths.h>
+#endif /* _HAVE_PATHS_H_ */
 #include <assert.h>
-#include <err.h>
+#ifdef _HAVE_ERR_H_
+# include <err.h>
+#endif /* _HAVE_ERR_H_ */
 #include <fcntl.h>
 #include <ndbm.h>
 #include <netdb.h>
 #include <sysexits.h>
+#include <stdarg.h>
+#include <syslog.h>
+#ifdef _HAVE_USERDEFS_H_
+#include <userdefs.h>
+#endif /* _HAVE_USERDEFS_H_ */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 
 #include <netinet/in.h>
+
+#ifndef PAM_AF_DEFS
+# define LOGERR(...) warnx(__VA_ARGS__)
+#else /* !PAM_AF_DEFS */
+# include <security/pam_appl.h>
+# ifdef _OPENPAM
+#  include <security/pam_mod_misc.h>
+#  include <security/openpam.h>
+# endif
+# define LOGERR(...) PAM_AF_LOGERR(__VA_ARGS__)
+#endif /* PAM_AF_DEFS */
 
 #include "pam_af.h"
 #include "subr.h"
@@ -61,14 +81,47 @@
 #define IPV4SZ sizeof(struct in_addr)
 #define IPV6SZ sizeof(struct in6_addr)
 
-#ifndef PAM_AF_DEFS
-# define LOGERR(...) warnx(__VA_ARGS__)
-#else /* !PAM_AF_DEFS */
-# include <security/pam_appl.h>
-# include <security/pam_mod_misc.h>
-# include <security/openpam.h>
-# define LOGERR(...) openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
-#endif /* PAM_AF_DEFS */
+#ifndef _HAVE_ERR_H_
+void
+err(int err_code, const char *format, ...)
+{
+	va_list	args;
+
+	va_start(args, format);
+	fprintf(stderr, "%s: ", progname);
+	vfprintf(stderr, format, args);
+	fprintf(stderr, ": %s\n", strerror(errno));
+	va_end(args);
+
+	exit(err_code);
+}
+
+void
+errx(int err_code, const char *format, ...)
+{
+	va_list	args;
+
+	va_start(args, format);
+	fprintf(stderr, "%s: ", progname);
+	vfprintf(stderr, format, args);
+	fprintf(stderr, "\n");
+	va_end(args);
+
+	exit(err_code);
+}
+
+void
+warnx(const char *format, ...)
+{
+	va_list	args;
+
+	va_start(args, format);
+	fprintf(stderr, "%s: ", progname);
+	vfprintf(stderr, format, args);
+	fprintf(stderr, "\n");
+	va_end(args);
+}
+#endif /* _HAVE_ERR_H_ */
 
 char *
 pam_af_strdupn(p, len)

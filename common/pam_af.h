@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.h,v 1.9 2005/10/06 15:18:02 stas Exp $
+ * $Id: pam_af.h,v 1.10 2005/10/14 04:14:53 stas Exp $
  */
 #ifndef _PAM_AF_H_
 #define _PAM_AF_H_
@@ -37,7 +37,23 @@
 #define CFGDB "/etc/pam_af.conf"
 #define CFGDB_PERM (S_IRUSR | S_IWUSR)
 
-#define PAM_AF_DEBUG
+#ifdef _OPENPAM
+# define PAM_AF_LOGERR(...) \
+	openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
+#else
+# define PAM_AF_LOGERR(...) \
+	syslog(LOG_CRIT, __VA_ARGS__)
+#endif
+
+#ifdef _OPENPAM
+# define PAM_AF_LOG(...) \
+	PAM_LOG(__VA_ARGS__)
+#else
+# define PAM_AF_LOG(...) \
+	syslog(LOG_DEBUG, __VA_ARGS__)
+#endif
+
+#undef PAM_AF_DEBUG
 #if defined(PAM_AF_DEBUG)
 # define ASSERT(exp) \
 	assert(exp);
@@ -55,12 +71,42 @@
 # define PASS
 #endif
 
+#ifndef PAM_EXTERN
+# define PAM_EXTERN
+#endif
+
+#ifndef _HAVE_FLOCK_
+# define flock(a,b) 0
+#endif
+
+#ifdef __STDC__
+#ifndef __P
+#define __P(x)  x
+#endif
+#else
+#ifndef __P
+#define __P(x)  ()
+#endif
+#endif /* __STDC__ */
+
+#ifndef _PATH_BSHELL
+# define _PATH_BSHELL DEFSHL
+#endif
+
 #ifndef __packed
-# define __packed __attribute__((packed))
+# ifdef __GNUC__
+#  define __packed __attribute__((packed))
+# else /* __GNUC__ */
+#  define __packed
+# endif /* __GNUC__ */
 #endif
 
 #ifndef __unused
-# define __unused __attribute__((unused))
+# ifdef __GNUC__
+#  define __unused __attribute__((unused))
+# else /* __GNUC__ */
+#  define __unused
+# endif /* __GNUC__ */
 #endif
 
 #ifndef PAM_RETURN

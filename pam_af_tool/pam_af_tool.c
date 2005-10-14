@@ -25,26 +25,31 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.23 2005/10/06 15:18:03 stas Exp $
+ * $Id: pam_af_tool.c,v 1.24 2005/10/14 04:14:53 stas Exp $
  */
 
 #include <errno.h>
-#include <err.h>
+#ifdef _HAVE_ERR_H_
+# include <err.h>
+#endif /* _HAVE_ERR_H_ */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdint.h>
 #include <limits.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <syslog.h>
-#include <paths.h>
+#ifdef _HAVE_PATHS_H_
+# include <paths.h>
+#endif /* _HAVE_PATHS_H_ */
+#include <sys/file.h>
 #include <assert.h>
 #include <sysexits.h>
 #include <time.h>
 #include <ndbm.h>
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -83,6 +88,7 @@ static const char *cfgdb = CFGDB;
 static const char *stdb = STATDB;
 static DBM *stdbp = NULL;
 static DBM *cfgdbp = NULL;
+const char *progname = NULL;
 
 /* Local defines */
 #define UNLIM "unlimited"
@@ -117,10 +123,10 @@ struct {
 static void
 usage(void)
 {
-#ifdef FreeBSD
+#ifdef _HAVE_GETPROGNAME_
 	const char	*prog = getprogname();
 #else
-	const char	*prog = "pam_af_tool";
+	const char	*prog = progname;
 #endif
 
 	(void)fprintf(stderr, "usage:\n"				\
@@ -147,7 +153,12 @@ main(argc, argv)
 	char	*argv[];
 {
 	unsigned int	i;
+	const char	*ret;
 	
+	progname = argv[0];
+	if ((ret = strrchr(progname, '/')) != NULL)
+		progname = ret + 1;
+
 	if (argc < 2)
 		usage();
 		/* NOTREACHED */
@@ -181,7 +192,7 @@ handle_ruleadd(argc, argv)
 	char	*argv[];
 {
 	char			*host = NULL;
-	int			family;
+	int			family = 0; /* Prevent stupid compiler warns */
 	hostrule_t		hstent;
 	datum			key, data;
 	struct myaddrinfo	*res, *res0;
@@ -269,7 +280,7 @@ handle_ruleadd(argc, argv)
 #ifndef O_EXLOCK
 	/* If we can't obtain lock through open(2) */
 	if (flock(dbm_pagfno(cfgdbp), LOCK_EX) != 0)
-		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", cfgdb);
+		err(EX_IOERR, "can't obtain exclusive lock on %s", cfgdb);
 #endif
 
 	atexit(cleanup);
@@ -312,7 +323,7 @@ handle_ruleadd(argc, argv)
 		ret = dbm_store(cfgdbp, key, data, dbflags);
 		switch (ret) {
 		case -1:
-			err(EX_OSERR, "can't store record");
+			err(EX_OSERR, "can't store record(s)");
 			/* NOTREACHED */
 		case 1:
 			if (flags & VFLAG)
@@ -423,7 +434,7 @@ handle_rulemod(argc, argv)
 #ifndef O_EXLOCK
 	/* If we can't obtain lock through open(2) */
 	if (flock(dbm_pagfno(cfgdbp), LOCK_EX) != 0)
-		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", cfgdb);
+		err(EX_IOERR, "can't obtain exclusive lock on %s", cfgdb);
 #endif
 
 	atexit(cleanup);
@@ -503,7 +514,7 @@ handle_rulemod(argc, argv)
 		data.dptr = (char *)&hstent;
 		data.dsize = sizeof(hstent);
 		if (dbm_store(cfgdbp, key, data, DBM_REPLACE) == -1)
-			err(EX_OSERR, "can't store record");
+			err(EX_OSERR, "can't store record(s)");
 
 		if (flags & VFLAG)
 			fprintf(stderr, "Modified rule for '%s'.\n", buf);
@@ -514,7 +525,7 @@ handle_rulemod(argc, argv)
 	my_freeaddrinfo(res0);
 
 	if (found == 0)
-		warnx("no suitable records found");
+		warnx("no suitable record found");
 
 	exit(EX_OK);
 }
@@ -528,9 +539,9 @@ handle_ruledel(argc, argv)
 	char			buf[1024], *tmp;
 	datum			key, data;
 	struct myaddrinfo	*res, *res0;
-	hostrule_t		*hstent;
+	hostrule_t		*hstent = NULL;
 	uint			mask;
-	int			family;
+	int			family = 0;
 	int			ret, flags = 0, found = 0;
 	char			ch;
 
@@ -573,7 +584,7 @@ handle_ruledel(argc, argv)
 #ifndef O_EXLOCK
 	/* If we can't obtain lock through open(2) */
 	if (flock(dbm_pagfno(cfgdbp), LOCK_EX) != 0)
-		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", cfgdb);
+		err(EX_IOERR, "can't obtain exclusive lock on %s", cfgdb);
 #endif
 
 	atexit(cleanup);
@@ -631,7 +642,7 @@ handle_ruledel(argc, argv)
 			continue;
 
 		if (dbm_delete(cfgdbp, key) != 0)
-			errx(EX_OSERR, "can't delete record for '%s'", buf);
+			errx(EX_OSERR, "can't delete record(s) for '%s'", buf);
 
 		if (flags & VFLAG)
 			(void)fprintf(stderr, "Deleted rule for '%s'.\n", buf);
@@ -641,7 +652,7 @@ handle_ruledel(argc, argv)
 	my_freeaddrinfo(res0);
 
 	if (found == 0)
-		warnx("no suitable records found");
+		warnx("no suitable record found");
 
 	exit(EX_OK);
 }
@@ -652,7 +663,7 @@ handle_rulelist(argc, argv)
 	char	*argv[];
 {
 	datum		key, data;
-	hostrule_t	*hstent;
+	hostrule_t	*hstent = NULL;
 	char		buf[1024];
 	int		ret;
 	char		ch;
@@ -765,7 +776,7 @@ handle_ruleflush(argc, argv)
 #ifndef O_EXLOCK
 	/* If we can't obtain lock through open(2) */
 	if (flock(dbm_pagfno(cfgdbp), LOCK_EX) != 0)
-		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", cfgdb);
+		err(EX_IOERR, "can't obtain exclusive lock on %s", cfgdb);
 #endif
 
 	atexit(cleanup);
@@ -774,12 +785,12 @@ handle_ruleflush(argc, argv)
 	for (key = dbm_firstkey(cfgdbp); key.dptr; key = dbm_firstkey(cfgdbp)) {
 		ret = dbm_delete(cfgdbp, key);
 		if (ret != 0)
-			err(EX_OSERR, "can't delete record");
+			err(EX_OSERR, "can't delete record(s)");
 		i++;
 	}
 
 	if (flags & VFLAG)
-		(void)fprintf(stderr, "%d records flushed.\n",i); 
+		(void)fprintf(stderr, "%d record(s) flushed.\n",i); 
 
 	exit(EX_OK);
 }
@@ -833,7 +844,7 @@ handle_statdel(argc, argv)
 #ifndef O_EXLOCK
 	/* If we can't obtain lock through open(2) */
 	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0)
-		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", stdb);
+		err(EX_IOERR, "can't obtain exclusive lock on %s", stdb);
 #endif
 
 	atexit(cleanup);
@@ -844,7 +855,7 @@ handle_statdel(argc, argv)
 	ret = dbm_delete(stdbp, key);
 	switch (ret) {
 	case -1:
-		err(EX_OSERR, "can't delete record");
+		err(EX_OSERR, "can't delete record(s)");
 	case 1:
 		warnx("record not found");
 	}
@@ -862,7 +873,7 @@ handle_statlist(argc, argv)
 	char	*argv[];
 {
 	datum		key, data;
-	hostrec_t	*hstrec;
+	hostrec_t	*hstrec = NULL;
 	char		*tstr;
 	char		ch;
 
@@ -953,7 +964,7 @@ handle_statflush(argc, argv)
 #ifndef O_EXLOCK
 	/* If we can't obtain lock through open(2) */
 	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0)
-		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", stdb);
+		err(EX_IOERR, "can't obtain exclusive lock on %s", stdb);
 #endif
 
 	atexit(cleanup);
@@ -962,12 +973,12 @@ handle_statflush(argc, argv)
 	for (key = dbm_firstkey(stdbp); key.dptr; key = dbm_firstkey(stdbp)) {
 		ret = dbm_delete(stdbp, key);
 		if (ret != 0)
-			err(EX_OSERR, "can't delete record");
+			err(EX_OSERR, "can't delete record(s)");
 		i++;
 	}
 
 	if (flags & VFLAG)
-		(void)fprintf(stderr, "%d records deleted.\n", i); 
+		(void)fprintf(stderr, "%d record(s) deleted.\n", i); 
 
 	exit(EX_OK);
 }
@@ -1173,12 +1184,16 @@ lock_host(host, force)
 	datum		key, data;
 	hostrec_t	hstrec;
 	hostrule_t	*hstent;
+	size_t		len;
 
 	/*
 	 * Setup enviropment for possible command's execution
 	 */
-	if (asprintf(&env[0], "PAM_RHOST=%s", host) < 0)
+	len = strlen("PAM_RHOST=") + strlen(host) + 1;
+	env[0] = (char *)malloc(len);
+	if (env[0] == NULL)
 		err(EX_OSERR, "malloc()");
+	snprintf(env[0], len, "PAM_RHOST=%s", host);
 	env[1] = NULL;
 
 	/*
@@ -1203,7 +1218,7 @@ lock_host(host, force)
 #ifndef O_EXLOCK
 	/* If we can't obtain lock through open(2) */
 	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0)
-		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", stdb);
+		err(EX_IOERR, "can't obtain exclusive lock on %s", stdb);
 #endif
 	key.dptr = host;
 	key.dsize = strlen(host) + 1;
@@ -1233,7 +1248,7 @@ lock_host(host, force)
 		key.dsize = strlen(host) + 1;
 
 		if (dbm_store(stdbp, key, data, DBM_REPLACE) != 0)
-			err(EX_OSERR, "can't store record");
+			err(EX_OSERR, "can't store record(s)");
 
 		dbm_close(stdbp);
 		stdbp = NULL;
@@ -1258,12 +1273,16 @@ unlock_host(host, force)
 	datum		key, data;
 	hostrec_t	hstrec;
 	hostrule_t	*hstent;
+	size_t		len;
 
 	/*
 	 * Setup enviropment for possible command's execution
 	 */
-	if (asprintf(&env[0], "PAM_RHOST=%s", host) < 0)
+	len = strlen("PAM_RHOST=") + strlen(host) + 1;
+	env[0] = (char *)malloc(len);
+	if (env[0] == NULL)
 		err(EX_OSERR, "malloc()");
+	snprintf(env[0], len, "PAM_RHOST=%s", host);
 	env[1] = NULL;
 
 	/*
@@ -1288,7 +1307,7 @@ unlock_host(host, force)
 #ifndef O_EXLOCK
 	/* If we can't obtain lock through open(2) */
 	if (flock(dbm_pagfno(stdbp), LOCK_EX) != 0)
-		err(EX_IOERR, "can't obtain exclusive lock on %s: %s\n", stdb);
+		err(EX_IOERR, "can't obtain exclusive lock on %s", stdb);
 #endif
 	key.dptr = host;
 	key.dsize = strlen(host) + 1;
@@ -1318,7 +1337,7 @@ unlock_host(host, force)
 		key.dsize = strlen(host) + 1;
 
 		if (dbm_store(stdbp, key, data, DBM_REPLACE) != 0)
-			err(EX_OSERR, "can't store record");
+			err(EX_OSERR, "can't store record(s)");
 
 		dbm_close(stdbp);
 		stdbp = NULL;
