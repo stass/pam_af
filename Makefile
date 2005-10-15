@@ -1,4 +1,6 @@
-# Copyright (c) 2005 Stanislav Sedov <ssedov@mbsd.msk.ru>
+# Copyright (c) 2004-2005 Stanislav Sedov <ssedov@mbsd.msk.ru>
+# Copyright (c) 2005 MBSD labs
+# Copyright (c) 2005 by 310.ru [Tridesyatoe], Moscow, Russian Federation
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -22,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: Makefile,v 1.7 2005/10/15 13:26:34 stas Exp $
+# $Id: Makefile,v 1.8 2005/10/15 14:52:49 stas Exp $
 #
 # Parts of this file was derived from software distributed by Solar Designer
 # under the following copyright:
