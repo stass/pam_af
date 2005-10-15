@@ -1,0 +1,67 @@
+			README
+pam_af is a simple anti-bruteforce PAM module for authentification
+services. It can be used to prevent brute-force attacks on services
+like SSH or Telnet.
+
+pam_af module maintains internal list of hosts and associated counters.
+When the host performs authentification attempt, it's counter incremented.
+After successful login the counter will flush.
+
+When host's counter value exceeds previously configured limit, the host
+will be blocked. Additionly, specific actions can be performed.
+
+Per-host rules can be added/modified through pam_af_tool utility. For
+performance reasons, we don't use plain text config and save pre-lookuped
+addresses in NDBM database, /etc/pam_af.conf by default.
+
+The module stores statistics in NDBM database too. It's usually
+/var/db/pam_af.db. It's hashed using hostname, since PAM returns
+hostname, not host's address. To search host's rule, the module
+performs lookup, however, it can decline login attempts from blocked
+hosts without lookups.
+
+The module should be stacked before your usual auth module. So
+your system will not send password request to "bad" host. You
+should use "requisite" control flag with pam_af module. This line
+could look like this:
+--------------------------------------------------------------------
+auth            requisite       /usr/local/lib/security/pam_af.so
+--------------------------------------------------------------------
+
+As was already mentioned above, the rules can be managed with
+pam_af_tool utility. You can add/modify/delete rules and print
+statistics. Additionly, this utilty can do lock/unlock specified
+hosts, in case if pam_af module is configured to automatically
+lock "bad" hosts in firewall, so the module can't deal with this
+host anymore.
+You can learn more about utility in pam_af_tool(8) manpage. It's
+pretty simple in use. Take a look on the following comands:
+ # pam_af_tool ruleadd -h localhost -a unlimited -t 0
+ # pam_af_tool ruleadd -h 124.45.34.2/21 -a 8 -t 16H23M12S
+ # pam_af_tool ruleadd -h 207.46.0.0/16 -a 5 -t 15H -l '/sbin/ipfw add
+            100 deny all from $PAM_RHOST to any'
+
+The first one allow unlimited number of attempts from localhost. Second will
+block all hosts from 124.45.34.2/21 network after 8 failed attemps for 16
+hours 23 minutes and 12 seconds. The last one will block 207.46.0.0/16 through
+firewall (FreeBSD).
+
+You can add defaul rule, issuing '*' instead of hostname, e.g. command
+ # pam_af_tool ruleadd -h '*' -a 15 -t 4y
+adds rule, that will block all hosts, which hasn't explicit rules,
+for 4 years after 15 failed attempts.
+
+pam_af module has some runtime options, you can take a look on it in
+pam_af(8) manpage. Not all options available on all platforms.
+
+Currently, this module works out-of-the-box on FreeBSD 4.x/5.x/6.x/7.x,
+Linux 2.6, SunOS 5.10/5.11. I have not tested it on other platforms,
+probably it will work, since source is fully POSIX-compliant.
+Report on success (or fail), please.
+
+Feel free to send bugs, reports, flames, etc to <ssedov@mbsd.msk.ru>.
+
+--
+Stanislav Sedov <ssedov@mbsd.msk.ru>
+
+$Id: README,v 1.1 2005/10/15 14:51:11 stas Exp $
