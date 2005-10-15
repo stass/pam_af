@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af_tool.c,v 1.24 2005/10/14 04:14:53 stas Exp $
+ * $Id: pam_af_tool.c,v 1.25 2005/10/15 13:26:37 stas Exp $
  */
 
 #include <errno.h>
@@ -36,7 +36,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#include <stdint.h>
+#if !defined(__FreeBSD__) || (__FreeBSD_version >= 500001)
+# include <stdint.h>
+#endif
 #include <limits.h>
 #include <unistd.h>
 #include <fcntl.h>

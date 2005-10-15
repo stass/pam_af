@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.17 2005/10/14 04:14:53 stas Exp $
+ * $Id: subr.c,v 1.18 2005/10/15 13:26:36 stas Exp $
  */
 
 #include <errno.h>
@@ -33,7 +33,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#include <stdint.h>
+#if !defined(__FreeBSD__) || (__FreeBSD_version >= 500001)
+# include <stdint.h>
+#endif
 #include <limits.h>
 #include <unistd.h>
 #ifdef _HAVE_PATHS_H_
@@ -198,6 +200,7 @@ my_getnameinfo(addr, addrlen, buf, buflen)
 		salen = addrlen;
 	}
 
+	sockaddr->sa_len = salen;
 	ret = getnameinfo(sockaddr, salen, buf, buflen, NULL, 0, \
 	    NI_NUMERICHOST);
 

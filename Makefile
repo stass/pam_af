@@ -22,7 +22,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: Makefile,v 1.6 2005/10/14 04:14:53 stas Exp $
+# $Id: Makefile,v 1.7 2005/10/15 13:26:34 stas Exp $
 #
 # Parts of this file was derived from software distributed by Solar Designer
 # under the following copyright:
@@ -59,15 +59,20 @@ INSTALL = install -c
 UNAME = uname -s
 
 CFLAGS = -I./common/
-CFLAGS_GCC =	-O2 -Wall -Wsystem-headers -Werror -Wno-format-y2k	\
+# Uncoment this to use strict options
+#CFLAGS_GCC =	-O2 -Wall -Wsystem-headers -Werror -Wno-format-y2k	\
+#		-Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch	\
+#		-Wshadow -Wcast-align -Wunused-parameter		\
+#		-Wchar-subscripts -Winline -Wnested-externs -fPIC
+CFLAGS_GCC =	-O2 -Wall -Werror -Wno-format-y2k			\
 		-Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch	\
-		-Wshadow -Wcast-align -Wunused-parameter		\
+		-Wshadow -Wcast-align					\
 		-Wchar-subscripts -Winline -Wnested-externs -fPIC
 CFLAGS_SUN = -KPIC -xO2 -D_SUN_PAM_ -D_HAVE_USERDEFS_H_
 CFLAGS_HP = -Ae +w1 +W 474,486,542 +z +O2
-CFLAGS_BSD = -D_HAVE_PATHS_H_ -D_HAVE_ERR_H_ -D_HAVE_GETPROGNAME_
+CFLAGS_BSD = -D_HAVE_PATHS_H_ -D_HAVE_ERR_H_ -D_HAVE_GETPROGNAME_ -D_USE_MODULE_ENTRY_
 CFLAGS_GNU =	-D_GNU_SOURCE -D_HAVE_PATHS_H_ -D_HAVE_ERR_H_ -D_HAVE_FLOCK_ \
-		-D_HAVE_SYS_FILE_H_
+		-D_HAVE_SYS_FILE_H_ -D_USE_MODULE_ENTRY_
 
 LDFLAGS_BSD =
 LDFLAGS_LINUX = -lgdbm -lgdbm_compat
