@@ -1,0 +1,29 @@
+1. FreeBSD 4.x/5.x/6.x/7.x
+On these systems module should work out-of-the-box, just type
+# make
+# make install
+
+Note for 4.x - when using with sshdm you should turn "UsePrivilegeSeparation"
+off, since FreeBSD 4.x's sshd version chnages process's uid before calling
+setcred.
+
+2. Linux
+It will work with all modern Linux distributions (I have not tested it with
+old distributions). You need PAM source to be installed. You will have to
+instal gdbm & gdbm-compat library, as glibc has no DBM suport by default.
+
+Use the same comands, as you will use for FreeBSD:
+# make
+# make install
+
+3. SunOS
+It can be surpising, but you will use the same commands to build module
+on your SunOS box. Your $PATH should contain directory with C compiler
+installed (/opt/SUNWspro/bin by default). Also it should contain
+/usr/ucb directory before any other directories with "install" utility.
+
+Now, just type:
+# make
+# make install
+
+$Id: INSTALL,v 1.1 2005/10/16 16:06:59 stas Exp $
