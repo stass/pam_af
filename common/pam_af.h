@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.h,v 1.11 2005/10/15 13:26:36 stas Exp $
+ * $Id: pam_af.h,v 1.12 2005/10/16 15:55:28 stas Exp $
  */
 #ifndef _PAM_AF_H_
 #define _PAM_AF_H_
@@ -38,19 +38,16 @@
 #define CFGDB_PERM (S_IRUSR | S_IWUSR)
 
 #ifdef _OPENPAM
+# define PAM_AF_LOG(...) \
+	PAM_LOG(__VA_ARGS__)
 # define PAM_AF_LOGERR(...) \
 	openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
 #else
-# define PAM_AF_LOGERR(...) \
-	syslog(LOG_CRIT, __VA_ARGS__)
-#endif
-
-#ifdef _OPENPAM
-# define PAM_AF_LOG(...) \
-	PAM_LOG(__VA_ARGS__)
-#else
 # define PAM_AF_LOG(...) \
 	syslog(LOG_DEBUG, __VA_ARGS__)
+# define PAM_AF_LOGERR(...) \
+	syslog(LOG_CRIT, __VA_ARGS__)
+# define _USE_SYSLOG_
 #endif
 
 #undef PAM_AF_DEBUG

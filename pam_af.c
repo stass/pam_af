@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.22 2005/10/15 13:26:34 stas Exp $
+ * $Id: pam_af.c,v 1.23 2005/10/16 15:55:27 stas Exp $
  */
 
 #include <errno.h>
@@ -84,22 +84,6 @@ static struct {
 };
 #define NITEMS (sizeof(env_items) / sizeof(*env_items))
 
-#ifdef _OPENPAM
-# define PAM_AF_LOGERR(...) \
-	openpam_log(PAM_LOG_ERROR, __VA_ARGS__)
-#else
-# define PAM_AF_LOGERR(...) \
-	syslog(LOG_CRIT, __VA_ARGS__)
-#endif
-
-#ifdef _OPENPAM
-# define PAM_AF_LOG(...) \
-	PAM_LOG(__VA_ARGS__)
-#else
-# define PAM_AF_LOG(...) \
-	syslog(LOG_DEBUG, __VA_ARGS__)
-#endif
-	
 static const char *
 pam_af_get_option(optc, optv, opt0)
 	int		optc;
@@ -214,7 +198,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	int update_when_locked = 0; /* Update host stats when it's locked */
 
-#ifdef __linux__
+#ifdef _USE_SYSLOG_
 	openlog("pam_af", 0, LOG_AUTHPRIV);
 #endif
 
@@ -377,7 +361,7 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	const char	*tmp;
 	int		ret;
 
-#ifdef __linux__
+#ifdef _USE_SYSLOG_
 	openlog("pam_af", 0, LOG_AUTHPRIV);
 #endif
 

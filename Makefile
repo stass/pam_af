@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: Makefile,v 1.8 2005/10/15 14:52:49 stas Exp $
+# $Id: Makefile,v 1.9 2005/10/16 15:55:27 stas Exp $
 #
 # Parts of this file was derived from software distributed by Solar Designer
 # under the following copyright:
@@ -60,7 +60,7 @@ MKDIR = mkdir -p
 INSTALL = install -c
 UNAME = uname -s
 
-CFLAGS = -I./common/
+CFLAGS = -I./common/ -DPIC
 # Uncoment this to use strict options
 #CFLAGS_GCC =	-O2 -Wall -Wsystem-headers -Werror -Wno-format-y2k	\
 #		-Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch	\
