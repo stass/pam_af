@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: Makefile,v 1.9 2005/10/16 15:55:27 stas Exp $
+# $Id: Makefile,v 1.10 2005/10/16 16:18:51 stas Exp $
 #
 # Parts of this file was derived from software distributed by Solar Designer
 # under the following copyright:
@@ -72,9 +72,9 @@ CFLAGS_GCC =	-O2 -Wall -Werror -Wno-format-y2k			\
 		-Wchar-subscripts -Winline -Wnested-externs -fPIC
 CFLAGS_SUN = -KPIC -xO2 -D_SUN_PAM_ -D_HAVE_USERDEFS_H_
 CFLAGS_HP = -Ae +w1 +W 474,486,542 +z +O2
-CFLAGS_BSD = -D_HAVE_PATHS_H_ -D_HAVE_ERR_H_ -D_HAVE_GETPROGNAME_ -D_USE_MODULE_ENTRY_
+CFLAGS_BSD = -D_HAVE_PATHS_H_ -D_HAVE_ERR_H_ -D_HAVE_GETPROGNAME_ -D_USE_MODULE_ENTRY_ -D_HAVE_SALEN_
 CFLAGS_GNU =	-D_GNU_SOURCE -D_HAVE_PATHS_H_ -D_HAVE_ERR_H_ -D_HAVE_FLOCK_ \
-		-D_HAVE_SYS_FILE_H_ -D_USE_MODULE_ENTRY_
+		-D_HAVE_SYS_FILE_H_
 
 LDFLAGS_BSD =
 LDFLAGS_LINUX = -lgdbm -lgdbm_compat

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.18 2005/10/15 13:26:36 stas Exp $
+ * $Id: subr.c,v 1.19 2005/10/16 16:18:51 stas Exp $
  */
 
 #include <errno.h>
@@ -200,7 +200,9 @@ my_getnameinfo(addr, addrlen, buf, buflen)
 		salen = addrlen;
 	}
 
+#ifdef _HAVE_SALEN_
 	sockaddr->sa_len = salen;
+#endif
 	ret = getnameinfo(sockaddr, salen, buf, buflen, NULL, 0, \
 	    NI_NUMERICHOST);
 
