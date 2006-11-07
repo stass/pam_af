@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.19 2005/10/16 16:18:51 stas Exp $
+ * $Id: subr.c,v 1.20 2006/11/07 00:17:09 stas Exp $
  */
 
 #include <errno.h>
@@ -345,7 +345,7 @@ find_host_rule(db, host)
 	if ((ret = my_getaddrinfo(host, PF_UNSPEC, &res0)) != 0) {
 		LOGERR("can't resolve hostname '%s', using default values: %s",\
 		    host, my_gai_strerror(ret));
-		goto nodb;
+		goto nohostentry;
 	}
 
 	for (res = res0; res && !found; res = res->next) {
@@ -376,6 +376,9 @@ find_host_rule(db, host)
 			}
 		}
 	}
+
+nohostentry:
+
 	if (found == 0) {
 		key.dptr = strdup(DEFRULE);
 		if (key.dptr == NULL) {
