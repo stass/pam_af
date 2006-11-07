@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: subr.c,v 1.20 2006/11/07 00:17:09 stas Exp $
+ * $Id: subr.c,v 1.21 2006/11/07 00:22:37 stas Exp $
  */
 
 #include <errno.h>
@@ -322,7 +322,7 @@ find_host_rule(db, host)
 	const char	*db;
 	char		*host;
 {
-	datum			key, data;
+	datum			key, data = {NULL, 0};
 	struct			myaddrinfo *res0, *res;
 	static hostrule_t	hstent;
 	int			found = 0;
