@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_af.c,v 1.23 2005/10/16 15:55:27 stas Exp $
+ * $Id: pam_af.c,v 1.24 2006/11/07 00:05:53 stas Exp $
  */
 
 #include <errno.h>
@@ -218,6 +218,12 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 #else /* _SUN_PAM_ */
 	ret = pam_get_item(pamh, PAM_RHOST, (void **)&host);
 #endif /* _SUN_PAM_ */
+
+	if (host == NULL)
+		host = (void *)strdup("localhost"); /* Map local logins to
+						       "localhost"
+						     */
+
 	if (ret != PAM_SUCCESS) {
 		PAM_AF_LOGERR("can't get '%s' item\n", "PAM_RHOST");
 		PAM_RETURN(pam_err_ret);
@@ -360,11 +366,14 @@ pam_sm_setcred(pamh, flags, argc, argv)
 	hostrec_t	hstr;
 	const char	*tmp;
 	int		ret;
+	int		pam_err_ret = PAM_SERVICE_ERR;/* Default ret value */
 
 #ifdef _USE_SYSLOG_
 	openlog("pam_af", 0, LOG_AUTHPRIV);
 #endif
 
+	if (pam_af_get_option(argc, argv, "allow_on_error") != NULL)
+		pam_err_ret = PAM_SUCCESS;
 	if ((tmp = pam_af_get_option(argc, argv, "statdb")) != NULL)
 		stdb = tmp;	
 
@@ -376,9 +385,13 @@ pam_sm_setcred(pamh, flags, argc, argv)
 #endif /* _SUN_PAM_ */
 	if (ret != PAM_SUCCESS) {
 		PAM_AF_LOGERR("can't get '%s' item\n", "PAM_RHOST");
-		PAM_RETURN(PAM_SERVICE_ERR);
+		PAM_RETURN(pam_err_ret);
 	}
 
+	if (host == NULL)
+		host = (void *)strdup("localhost"); /* Map local logins to
+						       "localhost"
+						     */
 	/* Open statistics database */
 #ifdef O_EXLOCK
 	stdbp = dbm_open(stdb, O_RDWR | O_CREAT | O_EXLOCK, STATDB_PERM);
@@ -395,7 +408,7 @@ pam_sm_setcred(pamh, flags, argc, argv)
 		if (getuid() == 0) {
 			PAM_AF_LOGERR("can't open '%s' database: %s\n", \
 			    stdb, strerror(errno));
-			PAM_RETURN(PAM_CRED_UNAVAIL);
+			PAM_RETURN(pam_err_ret);
 		}
 		else
 			PAM_RETURN(PAM_SUCCESS);
@@ -407,7 +420,7 @@ pam_sm_setcred(pamh, flags, argc, argv)
 		PAM_AF_LOGERR("can't obtain exclusive lock on %s: %s\n",
 			stdb, strerror(errno));
 		dbm_close(stdbp);
-		PAM_RETURN(PAM_CRED_UNAVAIL);
+		PAM_RETURN(pam_err_ret);
 	}
 #endif
 
