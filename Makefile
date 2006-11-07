@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: Makefile,v 1.11 2006/11/07 00:22:20 stas Exp $
+# $Id: Makefile,v 1.12 2006/11/07 00:26:58 stas Exp $
 #
 # Parts of this file was derived from software distributed by Solar Designer
 # under the following copyright:
@@ -68,8 +68,7 @@ CFLAGS = -I./common/ -DPIC
 #		-Wchar-subscripts -Winline -Wnested-externs -fPIC
 CFLAGS_GCC =	-O2 -Wall -Werror -Wno-format-y2k			\
 		-Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch	\
-		-Wshadow
-		-Wchar-subscripts -Winline -Wnested-externs -fPIC
+		-Wshadow -Wchar-subscripts -Winline -Wnested-externs -fPIC
 CFLAGS_SUN = -KPIC -xO2 -D_SUN_PAM_ -D_HAVE_USERDEFS_H_
 CFLAGS_HP = -Ae +w1 +W 474,486,542 +z +O2
 CFLAGS_BSD = -D_HAVE_PATHS_H_ -D_HAVE_ERR_H_ -D_HAVE_GETPROGNAME_ -D_USE_MODULE_ENTRY_ -D_HAVE_SALEN_
