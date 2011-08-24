@@ -66,7 +66,7 @@
 # define LOGERR(...) warnx(__VA_ARGS__)
 #else /* !PAM_AF_DEFS */
 # include <security/pam_appl.h>
-# ifdef _OPENPAM
+# if defined(OPENPAM) || defined(_OPENPAM)
 #  include <security/pam_mod_misc.h>
 #  include <security/openpam.h>
 # endif

@@ -53,7 +53,7 @@
 
 #include <security/pam_appl.h>
 #include <security/pam_modules.h>
-#ifdef _OPENPAM
+#if defined(OPENPAM) || defined(_OPENPAM)
 # include <security/openpam.h>
 # include <security/pam_mod_misc.h>
 #endif
