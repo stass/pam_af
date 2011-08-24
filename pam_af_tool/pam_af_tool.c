@@ -199,8 +199,8 @@ handle_ruleadd(argc, argv)
 	datum			key, data;
 	struct myaddrinfo	*res, *res0;
 	char			buf[1024], *tmp;
-	char			ch, *ep;
-	int			flags = 0, dbflags;
+	char			*ep;
+	int			ch, flags = 0, dbflags;
 	int			ret;
 
 	bzero(&hstent, sizeof(hstent));
@@ -362,8 +362,8 @@ handle_rulemod(argc, argv)
 	int			found = 0;
 	uint			mask;
 	int			family;
-	int			flags = 0, ret;
-	char			ch, *ep;
+	int			ch, flags = 0, ret;
+	char			*ep;
 
 	/* Avoid compiller warnings */
 	attempts = 0;
@@ -545,7 +545,7 @@ handle_ruledel(argc, argv)
 	uint			mask;
 	int			family = 0;
 	int			ret, flags = 0, found = 0;
-	char			ch;
+	int			ch;
 
 	while ((ch = getopt(argc, argv, "h:r:v")) != -1) {
 		switch (ch) {
@@ -668,7 +668,7 @@ handle_rulelist(argc, argv)
 	hostrule_t	*hstent = NULL;
 	char		buf[1024];
 	int		ret;
-	char		ch;
+	int		ch;
 
 	while ((ch = getopt(argc, argv, "r:")) != -1) {
 		switch (ch) {
@@ -746,7 +746,7 @@ handle_ruleflush(argc, argv)
 	datum	key;
 	int	flags = 0;
 	int	ret, i;
-	char	ch;
+	int	ch;
 
 	while ((ch = getopt(argc, argv, "r:v")) != -1) {
 		switch (ch) {
@@ -805,7 +805,7 @@ handle_statdel(argc, argv)
 	datum	key;
 	char	*host = NULL;
 	int	flags = 0, ret;
-	char	ch;
+	int	ch;
 
 	while ((ch = getopt(argc, argv, "h:s:v")) != -1) {
 		switch (ch) {
@@ -877,7 +877,7 @@ handle_statlist(argc, argv)
 	datum		key, data;
 	hostrec_t	*hstrec = NULL;
 	char		*tstr;
-	char		ch;
+	int		ch;
 
 	while ((ch = getopt(argc, argv, "s:")) != -1) {
 		switch (ch) {
@@ -934,7 +934,7 @@ handle_statflush(argc, argv)
 	datum key;
 	int flags = 0;
 	int ret, i;
-	char ch;
+	int ch;
 
 	while ((ch = getopt(argc, argv, "s:v")) != -1) {
 		switch (ch) {
@@ -993,7 +993,7 @@ handle_lock(argc, argv)
 	char		*host = NULL;
 	int		flags = 0, ret;
 	datum		key;
-	char		ch;
+	int		ch;
 	struct host_list {
 		char			*host;
 		struct host_list	*next;
@@ -1087,7 +1087,7 @@ handle_unlock(argc, argv)
 	char		*host = NULL;
 	int		flags = 0, ret;
 	datum		key;
-	char		ch;
+	int		ch;
 	struct host_list {
 		char			*host;
 		struct host_list	*next;
