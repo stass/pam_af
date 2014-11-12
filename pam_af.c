@@ -197,6 +197,7 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 	char		**env;
 
 	int update_when_locked = 0; /* Update host stats when it's locked */
+	int sleep_on_deny = 0;	    /* delay when denying access */
 
 #ifdef _USE_SYSLOG_
 	openlog("pam_af", 0, LOG_AUTHPRIV);
@@ -207,6 +208,8 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		pam_err_ret = PAM_SUCCESS; 
 	if (pam_af_get_option(argc, argv, "update_locked") != NULL)
 		update_when_locked = 1; 
+	if ((tmp = pam_af_get_option(argc, argv, "sleep_on_deny")) != NULL)
+		sleep_on_deny = atoi(tmp); 
 	if ((tmp = pam_af_get_option(argc, argv, "statdb")) != NULL)
 		stdb = tmp;	
 	if ((tmp = pam_af_get_option(argc, argv, "cfgdb")) != NULL)
@@ -298,6 +301,8 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 		if (update_when_locked == 0) {
 			/* Fast rejection */
 			dbm_close(stdbp);
+			if (sleep_on_deny > 0)
+			    sleep (sleep_on_deny * (hstr.num + 1));
 			PAM_RETURN(pam_ret);
 		}
 	}
@@ -348,6 +353,9 @@ pam_sm_authenticate(pamh, flags, argc, argv)
 
 	dbm_close(stdbp);
 	pam_af_free_env(env);
+
+	if (pam_ret == PAM_AUTH_ERR && sleep_on_deny > 0)
+	    sleep (sleep_on_deny * hstr.num);
 
 	PAM_RETURN(pam_ret);
 }

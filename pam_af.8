@@ -126,6 +126,11 @@ specify this option to force the
 module to update host's statistics even if the host is locked. This can
 increase module's overhead. This option can be useful if you wants the lock
 time to be measured from the last attempt.
+.It Cm sleep_on_deny=seconds
+Use this option to sleep a time every time
+.Nm
+denies access.
+The time is multiplied by the number of recorded login attempts.
 .It Cm statdb=file
 Use file as backing storage for the statistics databse. By default
 .Pa /var/db/pam_af.db
